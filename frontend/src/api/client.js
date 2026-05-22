@@ -25,8 +25,9 @@ client.interceptors.response.use(
       if (refreshToken) {
         try {
           const res = await client.post('/auth/reissue', { refreshToken })
-          const newAccessToken = res.data.accessToken
+          const { accessToken: newAccessToken, refreshToken: newRefreshToken } = res.data
           localStorage.setItem('accessToken', newAccessToken)
+          localStorage.setItem('refreshToken', newRefreshToken)
           originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
           return client(originalRequest)
         } catch {

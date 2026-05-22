@@ -1,6 +1,17 @@
+import { useEffect, useState } from 'react'
+import client from '../api/client'
+
 function LoginPage() {
+  const [loginUrl, setLoginUrl] = useState(null)
+
+  useEffect(() => {
+    client.get('/auth/kakao/login-url').then((res) => {
+      setLoginUrl(res.data)
+    })
+  }, [])
+
   const handleKakaoLogin = () => {
-    window.location.href = 'http://localhost:8080/oauth2/authorization/kakao'
+    if (loginUrl) window.location.href = loginUrl
   }
 
   return (
@@ -13,13 +24,9 @@ function LoginPage() {
 
         <button
           onClick={handleKakaoLogin}
-          className="w-full flex items-center justify-center gap-3 bg-[#FEE500] hover:bg-[#F0D800] text-gray-900 font-medium py-3 px-4 rounded-xl transition-colors"
+          disabled={!loginUrl}
+          className="w-full flex items-center justify-center gap-3 bg-[#FEE500] hover:bg-[#F0D800] disabled:opacity-50 text-gray-900 font-medium py-3 px-4 rounded-xl transition-colors"
         >
-          <img
-            src="https://developers.kakao.com/assets/img/about/logos/kakaolink/kakaolink_btn_medium.png"
-            alt="kakao"
-            className="w-5 h-5"
-          />
           카카오로 시작하기
         </button>
       </div>

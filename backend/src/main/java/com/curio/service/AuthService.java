@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -22,7 +23,7 @@ public class AuthService {
     private final JwtUtil jwtUtil;
 
     @Transactional
-    public String reissueAccessToken(String refreshToken) {
+    public Map<String, String> reissue(String refreshToken) {
         if (!jwtUtil.validateRefreshToken(refreshToken)) {
             throw new CurioException(ErrorCode.INVALID_TOKEN);
         }
@@ -39,6 +40,7 @@ public class AuthService {
 
         // refresh token rotation
         refreshTokenRepository.delete(stored);
+        String newAccessToken = jwtUtil.generateAccessToken(user.getId());
         String newRefreshToken = jwtUtil.generateRefreshToken(user.getId());
         refreshTokenRepository.save(RefreshToken.builder()
                 .user(user)
@@ -46,7 +48,7 @@ public class AuthService {
                 .expiredAt(LocalDateTime.now().plusSeconds(jwtUtil.getRefreshExpiration() / 1000))
                 .build());
 
-        return jwtUtil.generateAccessToken(user.getId());
+        return Map.of("accessToken", newAccessToken, "refreshToken", newRefreshToken);
     }
 
     @Transactional
