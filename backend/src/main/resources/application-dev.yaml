@@ -1,0 +1,53 @@
+spring:
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:localhost}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:curio}?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&serverTimezone=Asia/Seoul
+    username: ${MYSQL_USER:curio}
+    password: ${MYSQL_PASSWORD:curio1234}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    show-sql: true
+
+  security:
+    oauth2:
+      client:
+        registration:
+          kakao:
+            client-id: ${KAKAO_CLIENT_ID}
+            redirect-uri: ${KAKAO_REDIRECT_URI:http://localhost:8080/api/v1/auth/kakao/callback}
+            authorization-grant-type: authorization_code
+            client-authentication-method: client_secret_post
+            scope:
+              - profile_nickname
+              - profile_image
+        provider:
+          kakao:
+            authorization-uri: https://kauth.kakao.com/oauth/authorize
+            token-uri: https://kauth.kakao.com/oauth/token
+            user-info-uri: https://kapi.kakao.com/v2/user/me
+            user-name-attribute: id
+
+jwt:
+  access-secret: ${JWT_ACCESS_SECRET:dev-access-secret-key-must-be-at-least-32-chars}
+  refresh-secret: ${JWT_REFRESH_SECRET:dev-refresh-secret-key-must-be-at-least-32-chars}
+  access-expiration: ${JWT_ACCESS_EXPIRATION:1800000}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:1209600000}
+
+aws:
+  access-key: ${AWS_ACCESS_KEY:}
+  secret-key: ${AWS_SECRET_KEY:}
+  region: ${AWS_REGION:ap-northeast-2}
+  s3:
+    bucket: ${S3_BUCKET_NAME:}
+
+openai:
+  api-key: ${OPENAI_API_KEY:}
+  model: gpt-4.1-mini
+
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+
+logging:
+  level:
+    com.curio: DEBUG
+    org.hibernate.SQL: DEBUG

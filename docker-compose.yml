@@ -1,0 +1,36 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: curio-mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root1234}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-curio}
+      MYSQL_USER: ${MYSQL_USER:-curio}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-curio1234}
+    volumes:
+      - curio-mysql-data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: curio-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - curio-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  curio-mysql-data:
+  curio-redis-data:
