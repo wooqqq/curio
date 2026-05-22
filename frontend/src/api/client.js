@@ -15,11 +15,30 @@ client.interceptors.request.use((config) => {
 
 client.interceptors.response.use(
   (response) => response.data,
-  (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('accessToken')
-      window.location.href = '/login'
+  async (error) => {
+    const originalRequest = error.config
+
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true
+      const refreshToken = localStorage.getItem('refreshToken')
+
+      if (refreshToken) {
+        try {
+          const res = await client.post('/auth/reissue', { refreshToken })
+          const newAccessToken = res.data.accessToken
+          localStorage.setItem('accessToken', newAccessToken)
+          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
+          return client(originalRequest)
+        } catch {
+          localStorage.removeItem('accessToken')
+          localStorage.removeItem('refreshToken')
+          window.location.href = '/login'
+        }
+      } else {
+        window.location.href = '/login'
+      }
     }
+
     return Promise.reject(error.response?.data ?? error)
   }
 )
