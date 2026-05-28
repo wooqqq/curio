@@ -35,3 +35,6 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Local JVM config (contains machine-specific Java path) ###
+gradle.properties

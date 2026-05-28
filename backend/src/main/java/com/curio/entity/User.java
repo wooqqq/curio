@@ -25,6 +25,9 @@ public class User {
 
     private String profileImageUrl;
 
+    @Column(unique = true)
+    private String botUserKey;
+
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -43,5 +46,9 @@ public class User {
     public void update(String nickname, String profileImageUrl) {
         this.nickname = nickname;
         this.profileImageUrl = profileImageUrl;
+    }
+
+    public void updateBotUserKey(String botUserKey) {
+        this.botUserKey = botUserKey;
     }
 }

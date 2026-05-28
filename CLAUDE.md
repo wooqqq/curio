@@ -50,12 +50,20 @@ curio/                          ← 모노레포 루트
 │       └── styles/
 └── backend/
     └── src/main/java/com/curio/
-        ├── config/             ← CORS, Swagger, Security, Async
-        ├── dto/                ← ApiResponse, PaginationDto
-        ├── entity/             ← User, Item, Tag, RefreshToken
+        ├── config/             ← CORS, Swagger, Security, Async, AWS
+        ├── dto/
+        │   ├── kakao/          ← KakaoSkillRequest/Response
+        │   └── item/           ← OgData, ClassificationResult
+        ├── entity/
+        │   ├── enums/          ← ItemType, Category, ItemStatus
+        │   └── (User, Item, Tag, RefreshToken)
         ├── repository/
         ├── service/
-        │   └── queue/          ← QueueService (인터페이스 + 구현체)
+        │   ├── queue/          ← QueueService (인터페이스 + 구현체)
+        │   ├── OgCrawlerService
+        │   ├── OpenAiService
+        │   ├── S3Service
+        │   └── LinkCodeService
         ├── processor/          ← ItemProcessor (크롤링, AI, 저장)
         ├── controller/
         ├── exception/          ← GlobalExceptionHandler, ErrorCode
@@ -101,7 +109,7 @@ curio/                          ← 모노레포 루트
 |-------|------|------|
 | Phase 1 | 환경 세팅 | ✅ 완료 |
 | Phase 2 | 카카오 로그인 | ✅ 완료 |
-| Phase 3 | 핵심 파이프라인 | ⏳ 대기 |
+| Phase 3 | 핵심 파이프라인 | 🚧 진행 중 |
 | Phase 4 | 웹 아카이브 UI | ⏳ 대기 |
 | Phase 5 | 검색 | ⏳ 대기 |
 | Phase 6 | 배포 | ⏳ 대기 |

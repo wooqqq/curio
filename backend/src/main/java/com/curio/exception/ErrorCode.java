@@ -22,7 +22,11 @@ public enum ErrorCode {
 
     // Item
     ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "ITEM_NOT_FOUND", "아이템을 찾을 수 없습니다."),
-    DUPLICATE_URL(HttpStatus.CONFLICT, "DUPLICATE_URL", "이미 저장된 링크입니다.");
+    DUPLICATE_URL(HttpStatus.CONFLICT, "DUPLICATE_URL", "이미 저장된 링크입니다."),
+
+    // Kakao Bot
+    BOT_USER_NOT_LINKED(HttpStatus.FORBIDDEN, "BOT_USER_NOT_LINKED", "카카오 봇 계정 연동이 필요합니다."),
+    INVALID_LINK_CODE(HttpStatus.BAD_REQUEST, "INVALID_LINK_CODE", "유효하지 않거나 만료된 연동 코드입니다.");
 
     private final HttpStatus httpStatus;
     private final String code;
