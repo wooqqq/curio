@@ -1,19 +1,14 @@
 package com.curio.processor;
 
-import com.curio.dto.item.ClassificationResult;
 import com.curio.dto.item.OgData;
 import com.curio.entity.Item;
-import com.curio.entity.Tag;
 import com.curio.entity.User;
-import com.curio.entity.enums.Category;
 import com.curio.entity.enums.ItemType;
 import com.curio.exception.CurioException;
 import com.curio.exception.ErrorCode;
 import com.curio.repository.ItemRepository;
-import com.curio.repository.TagRepository;
 import com.curio.repository.UserRepository;
 import com.curio.service.OgCrawlerService;
-import com.curio.service.OpenAiService;
 import com.curio.service.S3Service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +16,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.net.URI;
-import java.util.List;
 import java.util.regex.Pattern;
 
 @Slf4j
@@ -37,9 +31,7 @@ public class ItemProcessor {
 
     private final UserRepository userRepository;
     private final ItemRepository itemRepository;
-    private final TagRepository tagRepository;
     private final OgCrawlerService ogCrawlerService;
-    private final OpenAiService openAiService;
     private final S3Service s3Service;
 
     @Transactional
@@ -67,7 +59,6 @@ public class ItemProcessor {
         }
 
         OgData og = ogCrawlerService.crawl(url);
-        ClassificationResult classification = openAiService.classify(og.title(), og.description());
 
         Item item = Item.builder()
                 .user(user)
@@ -77,10 +68,8 @@ public class ItemProcessor {
                 .thumbnailUrl(og.thumbnailUrl())
                 .originalUrl(url)
                 .normalizedUrl(normalized)
-                .category(classification.category())
                 .build();
 
-        attachTags(item, classification.tags());
         itemRepository.save(item);
         log.info("LINK saved: userId={} title={}", user.getId(), og.title());
     }
@@ -96,7 +85,6 @@ public class ItemProcessor {
                 .originalUrl(imageUrl)
                 .thumbnailUrl(thumbnailUrl)
                 .s3Key(s3Key)
-                .category(Category.ETC)
                 .build();
 
         itemRepository.save(item);
@@ -104,29 +92,15 @@ public class ItemProcessor {
     }
 
     private void processText(User user, String text) {
-        ClassificationResult classification = text.length() >= MIN_TEXT_LENGTH_FOR_AI
-                ? openAiService.classify(null, text)
-                : new ClassificationResult(Category.ETC, List.of());
-
         Item item = Item.builder()
                 .user(user)
                 .type(ItemType.TEXT)
                 .title(text.length() > 100 ? text.substring(0, 100) + "..." : text)
                 .content(text)
-                .category(classification.category())
                 .build();
 
-        attachTags(item, classification.tags());
         itemRepository.save(item);
         log.info("TEXT saved: userId={}", user.getId());
-    }
-
-    private void attachTags(Item item, List<String> tagNames) {
-        for (String name : tagNames) {
-            Tag tag = tagRepository.findByName(name)
-                    .orElseGet(() -> tagRepository.save(Tag.builder().name(name).build()));
-            item.addTag(tag);
-        }
     }
 
     private ItemType detectType(String utterance) {

@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import LoginPage from './pages/LoginPage'
 import AuthCallbackPage from './pages/AuthCallbackPage'
-import HomePage from './pages/HomePage'
+import ArchivePage from './pages/ArchivePage'
 import useAuthStore from './store/authStore'
 
 function PrivateRoute({ children }) {
@@ -19,7 +19,7 @@ function App() {
           path="/"
           element={
             <PrivateRoute>
-              <HomePage />
+              <ArchivePage />
             </PrivateRoute>
           }
         />
