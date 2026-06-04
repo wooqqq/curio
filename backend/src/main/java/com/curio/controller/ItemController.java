@@ -20,9 +20,10 @@ public class ItemController {
     public ApiResponse<Page<ItemResponse>> getItems(
             @AuthenticationPrincipal Long userId,
             @RequestParam(required = false) Category category,
+            @RequestParam(required = false) String q,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return ApiResponse.success(itemService.getItems(userId, category, page, size));
+        return ApiResponse.success(itemService.getItems(userId, category, q, page, size));
     }
 }

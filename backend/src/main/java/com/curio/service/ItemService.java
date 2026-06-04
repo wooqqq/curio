@@ -16,13 +16,10 @@ public class ItemService {
 
     private final ItemRepository itemRepository;
 
-    public Page<ItemResponse> getItems(Long userId, Category category, int page, int size) {
+    public Page<ItemResponse> getItems(Long userId, Category category, String q, int page, int size) {
         PageRequest pageable = PageRequest.of(page, size);
-        if (category != null) {
-            return itemRepository.findByUserIdAndCategoryOrderByCreatedAtDesc(userId, category, pageable)
-                    .map(ItemResponse::from);
-        }
-        return itemRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable)
+        String keyword = (q == null || q.isBlank()) ? null : q.trim();
+        return itemRepository.search(userId, category, keyword, pageable)
                 .map(ItemResponse::from);
     }
 }

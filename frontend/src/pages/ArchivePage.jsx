@@ -186,16 +186,18 @@ function ArchivePage() {
   const [items, setItems] = useState([])
   const [totalCount, setTotalCount] = useState(0)
   const [category, setCategory] = useState(null)
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
   const [page, setPage] = useState(0)
   const [hasMore, setHasMore] = useState(true)
   const [loading, setLoading] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const logoutStore = useAuthStore(s => s.logout)
 
-  const fetchItems = useCallback(async (pg, cat) => {
+  const fetchItems = useCallback(async (pg, cat, query) => {
     setLoading(true)
     try {
-      const res = await getItems(cat, pg)
+      const res = await getItems(cat, pg, 20, query)
       const pageData = res.data
       setItems(prev => (pg === 0 ? pageData.content : [...prev, ...pageData.content]))
       setHasMore(!pageData.last)
@@ -205,21 +207,22 @@ function ArchivePage() {
     }
   }, [])
 
+  // 검색어 입력 디바운스 (300ms)
   useEffect(() => {
-    fetchItems(0, null)
-  }, [fetchItems])
+    const t = setTimeout(() => setSearch(searchInput.trim()), 300)
+    return () => clearTimeout(t)
+  }, [searchInput])
 
-  const handleCategory = (cat) => {
-    if (cat === category) return
-    setCategory(cat)
+  // 카테고리 또는 검색어 변경 시 첫 페이지부터 다시 조회
+  useEffect(() => {
     setPage(0)
-    fetchItems(0, cat)
-  }
+    fetchItems(0, category, search)
+  }, [category, search, fetchItems])
 
   const handleLoadMore = () => {
     const next = page + 1
     setPage(next)
-    fetchItems(next, category)
+    fetchItems(next, category, search)
   }
 
   const handleLogout = async () => {
@@ -258,7 +261,30 @@ function ArchivePage() {
         {/* 타이틀 */}
         <div className="pt-8 pb-5">
           <h1 className="text-[26px] font-extrabold text-[#191f28] tracking-tight">내 아카이브</h1>
-          <p className="text-sm text-[#8b95a1] mt-1">저장한 글 {totalCount}개</p>
+          <p className="text-sm text-[#8b95a1] mt-1">
+            {search ? `검색 결과 ${totalCount}개` : `저장한 글 ${totalCount}개`}
+          </p>
+
+          {/* 검색바 */}
+          <div className="relative mt-5">
+            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[15px] text-[#8b95a1]">🔍</span>
+            <input
+              type="text"
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
+              placeholder="제목, 내용, 태그 검색"
+              className="w-full bg-white rounded-2xl pl-11 pr-10 py-3 text-sm text-[#191f28] placeholder:text-[#8b95a1] shadow-[0_1px_2px_rgba(0,0,0,0.04)] outline-none focus:ring-2 focus:ring-[#191f28]/10 transition-shadow"
+            />
+            {searchInput && (
+              <button
+                onClick={() => setSearchInput('')}
+                aria-label="검색어 지우기"
+                className="absolute right-3 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full text-[#8b95a1] hover:bg-[#f2f4f6] transition-colors"
+              >
+                ✕
+              </button>
+            )}
+          </div>
         </div>
 
         {/* 카테고리 필터 (sticky) */}
@@ -269,7 +295,7 @@ function ArchivePage() {
               return (
                 <button
                   key={label}
-                  onClick={() => handleCategory(key)}
+                  onClick={() => setCategory(key)}
                   className={`shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-colors ${
                     active
                       ? 'bg-[#191f28] text-white'
@@ -287,11 +313,17 @@ function ArchivePage() {
         <div className="space-y-3 pt-3">
           {items.length === 0 && !loading ? (
             <div className="text-center py-24 text-[#8b95a1]">
-              <p className="text-5xl mb-4">📭</p>
+              <p className="text-5xl mb-4">{search ? '🔍' : '📭'}</p>
               <p className="text-[15px] font-semibold text-[#4e5968]">
-                {category ? '이 카테고리엔 저장된 글이 없어요.' : '아직 저장된 아이템이 없어요.'}
+                {search
+                  ? `'${search}' 검색 결과가 없어요.`
+                  : category
+                    ? '이 카테고리엔 저장된 글이 없어요.'
+                    : '아직 저장된 아이템이 없어요.'}
               </p>
-              <p className="text-sm mt-1.5">카카오톡 채널에 링크나 텍스트를 보내보세요!</p>
+              <p className="text-sm mt-1.5">
+                {search ? '다른 키워드로 검색해보세요.' : '카카오톡 채널에 링크나 텍스트를 보내보세요!'}
+              </p>
             </div>
           ) : (
             items.map(item => <ItemCard key={item.id} item={item} />)
