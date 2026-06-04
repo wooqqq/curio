@@ -25,8 +25,9 @@ function AuthCallbackPage() {
   }, [])
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <p className="text-gray-400">로그인 중...</p>
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#f2f4f6]">
+      <div className="h-8 w-8 rounded-full border-[3px] border-[#e5e8eb] border-t-[#191f28] animate-spin" />
+      <p className="text-sm font-medium text-[#8b95a1]">로그인 중...</p>
     </div>
   )
 }
