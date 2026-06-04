@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { getItems } from '../api/items'
+import { getItems, recrawlItem } from '../api/items'
 import { logout } from '../api/auth'
 import client from '../api/client'
 import useAuthStore from '../store/authStore'
@@ -120,13 +120,31 @@ function LinkCodeModal({ onClose }) {
   )
 }
 
-function ItemCard({ item }) {
+function ItemCard({ item, onRecrawl }) {
+  const [recrawling, setRecrawling] = useState(false)
+  const [recrawlError, setRecrawlError] = useState(false)
   const domain = getDomain(item.originalUrl)
   const source = domain || SOURCE_LABEL[item.type] || '링크'
   const clickable = Boolean(item.originalUrl)
+  // 저장 당시 크롤링 실패로 제목 자리에 raw URL이 들어간 경우
+  const titleBroken = item.type === 'LINK' && /^https?:\/\//i.test(item.title || '')
 
   const handleClick = () => {
     if (clickable) window.open(item.originalUrl, '_blank', 'noopener')
+  }
+
+  const handleRecrawl = async (e) => {
+    e.stopPropagation()
+    if (recrawling) return
+    setRecrawling(true)
+    setRecrawlError(false)
+    try {
+      await onRecrawl(item.id)
+    } catch {
+      setRecrawlError(true)
+    } finally {
+      setRecrawling(false)
+    }
   }
 
   return (
@@ -146,7 +164,7 @@ function ItemCard({ item }) {
         </div>
 
         <p className="text-[15px] font-bold text-[#191f28] leading-snug line-clamp-2 mb-1">
-          {item.title || item.content || '제목 없음'}
+          {titleBroken ? (domain || '제목 없음') : (item.title || item.content || '제목 없음')}
         </p>
 
         {item.aiSummary && (
@@ -165,6 +183,20 @@ function ItemCard({ item }) {
                 #{tag}
               </span>
             ))}
+          </div>
+        )}
+
+        {titleBroken && (
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              onClick={handleRecrawl}
+              disabled={recrawling}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-[#3182f6] hover:text-[#1b64da] disabled:text-[#8b95a1] transition-colors"
+            >
+              <span className={recrawling ? 'inline-block animate-spin' : ''}>↻</span>
+              {recrawling ? '불러오는 중...' : '제목 다시 불러오기'}
+            </button>
+            {recrawlError && <span className="text-xs text-red-400">다시 불러오지 못했어요</span>}
           </div>
         )}
       </div>
@@ -224,6 +256,12 @@ function ArchivePage() {
     setPage(next)
     fetchItems(next, category, search)
   }
+
+  const handleRecrawl = useCallback(async (id) => {
+    const res = await recrawlItem(id)
+    const updated = res.data
+    setItems(prev => prev.map(it => (it.id === id ? updated : it)))
+  }, [])
 
   const handleLogout = async () => {
     try { await logout() } catch (_) {}
@@ -326,7 +364,7 @@ function ArchivePage() {
               </p>
             </div>
           ) : (
-            items.map(item => <ItemCard key={item.id} item={item} />)
+            items.map(item => <ItemCard key={item.id} item={item} onRecrawl={handleRecrawl} />)
           )}
 
           {loading && (

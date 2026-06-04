@@ -6,36 +6,82 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.springframework.stereotype.Service;
 
+import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+
 @Slf4j
 @Service
 public class OgCrawlerService {
 
     private static final int TIMEOUT_MS = 5000;
+    private static final int MAX_ATTEMPTS = 2;
+    // 일부 사이트가 봇 UA를 차단하므로 실제 브라우저 UA 사용
     private static final String USER_AGENT =
-            "Mozilla/5.0 (compatible; CurioBot/1.0; +https://mycurio.kr)";
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+            "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
     public OgData crawl(String url) {
+        Exception lastError = null;
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            try {
+                Document doc = Jsoup.connect(url)
+                        .userAgent(USER_AGENT)
+                        .header("Accept-Language", "ko-KR,ko;q=0.9,en;q=0.8")
+                        .timeout(TIMEOUT_MS)
+                        .followRedirects(true)
+                        .get();
+
+                String title = meta(doc, "og:title");
+                if (title == null) title = meta(doc, "twitter:title");
+                if (title == null || title.isBlank()) title = doc.title();
+                if (title == null || title.isBlank()) title = titleFromUrl(url);
+
+                String thumbnail = meta(doc, "og:image");
+                if (thumbnail == null) thumbnail = meta(doc, "twitter:image");
+
+                String description = meta(doc, "og:description");
+                if (description == null) description = meta(doc, "twitter:description");
+
+                return new OgData(trim(title, 500), trim(thumbnail, 1000), trim(description, 1000));
+            } catch (Exception e) {
+                lastError = e;
+                log.warn("OG crawl attempt {}/{} failed for {}: {}", attempt, MAX_ATTEMPTS, url, e.getMessage());
+            }
+        }
+        // 크롤링 자체가 실패해도 raw URL 대신 슬러그에서 읽을 수 있는 제목을 복원
+        log.warn("OG crawl gave up for {}: {}", url, lastError != null ? lastError.getMessage() : "unknown");
+        return new OgData(trim(titleFromUrl(url), 500), null, null);
+    }
+
+    /**
+     * OG 크롤링 실패/제목 부재 시 URL 슬러그에서 제목을 추정한다.
+     * 예: ".../%EA%BC%BC%EC%88%98%EB%A1%9C-...-b34ee4cc2bc2" → "꼼수로 ..."
+     * 슬러그가 무의미(숫자/너무 짧음)하면 호스트명으로 폴백.
+     */
+    private String titleFromUrl(String url) {
         try {
-            Document doc = Jsoup.connect(url)
-                    .userAgent(USER_AGENT)
-                    .timeout(TIMEOUT_MS)
-                    .followRedirects(true)
-                    .get();
+            URI uri = new URI(url);
+            String host = uri.getHost() != null ? uri.getHost().replaceFirst("^www\\.", "") : url;
+            String path = uri.getPath();
+            if (path == null || path.isBlank()) return host;
 
-            String title = meta(doc, "og:title");
-            if (title == null) title = meta(doc, "twitter:title");
-            if (title == null) title = doc.title();
+            String slug = "";
+            for (String seg : path.split("/")) {
+                if (!seg.isBlank()) slug = seg; // 마지막 비어있지 않은 세그먼트
+            }
+            if (slug.isBlank()) return host;
 
-            String thumbnail = meta(doc, "og:image");
-            if (thumbnail == null) thumbnail = meta(doc, "twitter:image");
+            slug = URLDecoder.decode(slug, StandardCharsets.UTF_8);
+            slug = slug.replaceAll("\\.(html?|php|aspx?)$", "");   // 확장자 제거
+            slug = slug.replaceAll("-[0-9a-f]{6,}$", "");          // Medium 등 끝 해시 id 제거
+            slug = slug.replaceAll("[-_]+", " ").trim();           // 하이픈/언더스코어 → 공백
 
-            String description = meta(doc, "og:description");
-            if (description == null) description = meta(doc, "twitter:description");
-
-            return new OgData(trim(title, 500), trim(thumbnail, 1000), trim(description, 1000));
+            // 숫자만 남거나 너무 짧으면 호스트명이 더 유용
+            if (slug.isBlank() || slug.matches("\\d+") || slug.length() < 2) return host;
+            return slug;
         } catch (Exception e) {
-            log.warn("OG crawl failed for {}: {}", url, e.getMessage());
-            return new OgData(url, null, null);
+            return url;
         }
     }
 

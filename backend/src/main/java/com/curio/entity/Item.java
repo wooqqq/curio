@@ -105,6 +105,12 @@ public class Item {
         this.category = category;
     }
 
+    public void updateLinkMetadata(String title, String content, String thumbnailUrl) {
+        this.title = title;
+        this.content = content;
+        this.thumbnailUrl = thumbnailUrl;
+    }
+
     public void updateStatus(ItemStatus status) {
         this.status = status;
     }

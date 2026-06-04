@@ -6,3 +6,5 @@ export const getItems = (category, page = 0, size = 20, q = '') => {
   if (q && q.trim()) params.q = q.trim()
   return client.get('/items', { params })
 }
+
+export const recrawlItem = (id) => client.post(`/items/${id}/recrawl`)

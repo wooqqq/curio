@@ -26,4 +26,12 @@ public class ItemController {
     ) {
         return ApiResponse.success(itemService.getItems(userId, category, q, page, size));
     }
+
+    @PostMapping("/{id}/recrawl")
+    public ApiResponse<ItemResponse> recrawl(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long id
+    ) {
+        return ApiResponse.success(itemService.recrawl(userId, id));
+    }
 }
