@@ -1,18 +1,43 @@
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css');
 @import "tailwindcss";
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+/*
+ * 주의: `* { margin:0; padding:0 }` 같은 unlayered 전역 리셋을 두지 말 것.
+ * Tailwind v4 유틸리티는 @layer 안에 있어서 unlayered 규칙에 항상 밟힘
+ * → p-*, space-y-*, mx-auto 등이 전부 무효화됨. 리셋은 Preflight가 처리.
+ */
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background-color: #f9fafb;
-  color: #111827;
+  font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', system-ui, sans-serif;
+  background-color: #f2f4f6;
+  color: #191f28;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.01em;
 }
 
 #root {
   min-height: 100vh;
+}
+
+/* 가로 스크롤 필터 영역 스크롤바 숨김 */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* 봇 연동 모달 슬라이드업 (모바일 바텀시트) */
+@keyframes slideup {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

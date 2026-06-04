@@ -10,6 +10,33 @@ const TYPE_ICON = {
   TEXT: '📝',
 }
 
+const SOURCE_LABEL = {
+  IMAGE: '이미지',
+  TEXT: '메모',
+}
+
+const CATEGORIES = [
+  { key: null, label: '전체' },
+  { key: 'DEVELOPMENT', label: '개발' },
+  { key: 'CAREER', label: '커리어' },
+  { key: 'JOB', label: '취업' },
+  { key: 'ETC', label: '기타' },
+]
+
+function getDomain(url) {
+  try { return new URL(url).hostname.replace('www.', '') }
+  catch { return '' }
+}
+
+function timeAgo(dateStr) {
+  const diff = Math.floor((Date.now() - new Date(dateStr)) / 1000)
+  if (diff < 60) return '방금 전'
+  if (diff < 3600) return `${Math.floor(diff / 60)}분 전`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}시간 전`
+  if (diff < 604800) return `${Math.floor(diff / 86400)}일 전`
+  return new Date(dateStr).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })
+}
+
 function LinkCodeModal({ onClose }) {
   const [linkCode, setLinkCode] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -40,110 +67,159 @@ function LinkCodeModal({ onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-white rounded-2xl p-6 w-80 shadow-xl" onClick={e => e.stopPropagation()}>
-        <h2 className="text-base font-semibold text-gray-800 mb-1">카카오톡 봇 연동</h2>
-        <p className="text-sm text-gray-500 mb-4">코드를 카카오 채널에 전송하면 봇이 연결됩니다.</p>
+    <div
+      className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-end sm:items-center justify-center z-50"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white w-full sm:w-[22rem] rounded-t-3xl sm:rounded-3xl p-6 pb-8 shadow-2xl animate-[slideup_0.25s_ease]"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-[#e5e8eb] sm:hidden" />
+        <h2 className="text-lg font-bold text-[#191f28] mb-1">카카오톡 봇 연동</h2>
+        <p className="text-sm text-[#8b95a1] mb-5 leading-relaxed">
+          아래 코드를 카카오 채널에 전송하면<br />봇이 내 계정과 연결돼요.
+        </p>
 
         {error && <p className="text-sm text-red-500 mb-3">{error}</p>}
 
         {linkCode ? (
           <div className="space-y-3">
-            <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-4 py-3 border border-gray-200">
-              <span className="flex-1 text-center text-2xl font-bold tracking-widest text-gray-900">{linkCode}</span>
-              <button onClick={handleCopy} className="text-sm text-gray-500 hover:text-gray-800">
+            <div className="flex items-center gap-3 bg-[#f2f4f6] rounded-2xl px-5 py-4">
+              <span className="flex-1 text-center text-3xl font-bold tracking-[0.3em] text-[#191f28] pl-[0.3em]">
+                {linkCode}
+              </span>
+              <button
+                onClick={handleCopy}
+                className="shrink-0 text-sm font-semibold text-[#3182f6] hover:text-[#1b64da] transition-colors"
+              >
                 {copied ? '복사됨' : '복사'}
               </button>
             </div>
-            <p className="text-xs text-gray-400 text-center">10분 내에 카카오 채널에 전송하세요</p>
-            <button onClick={handleGet} disabled={loading} className="w-full text-sm text-gray-400 hover:text-gray-600 py-1">재발급</button>
+            <p className="text-xs text-[#8b95a1] text-center">10분 안에 카카오 채널에 전송하세요</p>
+            <button
+              onClick={handleGet}
+              disabled={loading}
+              className="w-full text-sm font-medium text-[#8b95a1] hover:text-[#4e5968] py-1 transition-colors"
+            >
+              재발급
+            </button>
           </div>
         ) : (
-          <p className="text-center text-gray-400 py-4">{loading ? '발급 중...' : '-'}</p>
+          <p className="text-center text-[#8b95a1] py-6">{loading ? '발급 중...' : '-'}</p>
         )}
 
-        <button onClick={onClose} className="mt-4 w-full text-sm text-gray-400 hover:text-gray-600 py-1">닫기</button>
+        <button
+          onClick={onClose}
+          className="mt-4 w-full bg-[#f2f4f6] hover:bg-[#e5e8eb] text-[#4e5968] text-sm font-semibold py-3.5 rounded-2xl transition-colors"
+        >
+          닫기
+        </button>
       </div>
     </div>
   )
 }
 
 function ItemCard({ item }) {
+  const domain = getDomain(item.originalUrl)
+  const source = domain || SOURCE_LABEL[item.type] || '링크'
+  const clickable = Boolean(item.originalUrl)
+
   const handleClick = () => {
-    if (item.originalUrl) window.open(item.originalUrl, '_blank', 'noopener')
+    if (clickable) window.open(item.originalUrl, '_blank', 'noopener')
   }
 
   return (
     <div
       onClick={handleClick}
-      className={`bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden ${item.originalUrl ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
+      className={`group bg-white rounded-2xl flex items-start gap-4 p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_16px_rgba(0,0,0,0.04)] transition-all duration-200 ${
+        clickable ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgba(0,0,0,0.06),0_12px_28px_rgba(0,0,0,0.08)]' : ''
+      }`}
     >
-      {item.thumbnailUrl && (
-        <img src={item.thumbnailUrl} alt={item.title} className="w-full h-40 object-cover" />
-      )}
-      <div className="p-4">
-        <div className="mb-1">
-          <span className="text-lg">{TYPE_ICON[item.type]}</span>
+      {/* 본문 */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 mb-1.5 text-xs text-[#8b95a1]">
+          <span>{TYPE_ICON[item.type]}</span>
+          <span className="truncate">{source}</span>
+          <span className="text-[#d1d6db]">·</span>
+          <span className="shrink-0">{timeAgo(item.createdAt)}</span>
         </div>
-        {item.title && (
-          <p className="font-medium text-gray-900 text-sm leading-snug mb-1 line-clamp-2">{item.title}</p>
-        )}
+
+        <p className="text-[15px] font-bold text-[#191f28] leading-snug line-clamp-2 mb-1">
+          {item.title || item.content || '제목 없음'}
+        </p>
+
         {item.aiSummary && (
-          <p className="text-xs text-gray-500 line-clamp-2 mb-2">{item.aiSummary}</p>
+          <p className="text-[13px] text-[#6b7684] leading-relaxed line-clamp-2 mb-2.5">
+            {item.aiSummary}
+          </p>
         )}
-        {!item.title && item.content && (
-          <p className="text-sm text-gray-700 line-clamp-3 mb-2">{item.content}</p>
-        )}
+
         {item.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2">
-            {item.tags.map(tag => (
-              <span key={tag} className="text-xs bg-yellow-50 text-yellow-700 px-2 py-0.5 rounded-full">#{tag}</span>
+          <div className="flex flex-wrap gap-1.5">
+            {item.tags.slice(0, 3).map(tag => (
+              <span
+                key={tag}
+                className="text-xs font-medium text-[#8b95a1] bg-[#f2f4f6] px-2.5 py-1 rounded-lg"
+              >
+                #{tag}
+              </span>
             ))}
           </div>
         )}
-        <p className="text-xs text-gray-300 mt-2">
-          {new Date(item.createdAt).toLocaleDateString('ko-KR')}
-        </p>
       </div>
+
+      {/* 썸네일 */}
+      {item.thumbnailUrl && (
+        <img
+          src={item.thumbnailUrl}
+          alt=""
+          className="shrink-0 w-16 h-16 object-cover rounded-xl bg-[#f2f4f6]"
+          onError={e => { e.currentTarget.style.display = 'none' }}
+        />
+      )}
     </div>
   )
 }
 
 function ArchivePage() {
   const [items, setItems] = useState([])
+  const [totalCount, setTotalCount] = useState(0)
+  const [category, setCategory] = useState(null)
   const [page, setPage] = useState(0)
   const [hasMore, setHasMore] = useState(true)
   const [loading, setLoading] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const logoutStore = useAuthStore(s => s.logout)
 
-  const fetchItems = useCallback(async (pg) => {
+  const fetchItems = useCallback(async (pg, cat) => {
     setLoading(true)
     try {
-      const res = await getItems(null, pg)
+      const res = await getItems(cat, pg)
       const pageData = res.data
-      if (pg === 0) {
-        setItems(pageData.content)
-      } else {
-        setItems(prev => [...prev, ...pageData.content])
-      }
+      setItems(prev => (pg === 0 ? pageData.content : [...prev, ...pageData.content]))
       setHasMore(!pageData.last)
+      setTotalCount(pageData.totalElements ?? 0)
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
+    fetchItems(0, null)
+  }, [fetchItems])
+
+  const handleCategory = (cat) => {
+    if (cat === category) return
+    setCategory(cat)
     setPage(0)
-    setItems([])
-    setHasMore(true)
-    fetchItems(0)
-  }, [])
+    fetchItems(0, cat)
+  }
 
   const handleLoadMore = () => {
     const next = page + 1
     setPage(next)
-    fetchItems(next)
+    fetchItems(next, category)
   }
 
   const handleLogout = async () => {
@@ -153,51 +229,87 @@ function ArchivePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#f2f4f6]">
       {showModal && <LinkCodeModal onClose={() => setShowModal(false)} />}
 
-      {/* 헤더 */}
-      <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
-          <h1 className="text-xl font-bold text-gray-900">Curio</h1>
-          <div className="flex items-center gap-3">
+      {/* 헤더 (frosted) */}
+      <header className="sticky top-0 z-20 bg-[#f2f4f6]/80 backdrop-blur-md border-b border-black/[0.04]">
+        <div className="max-w-2xl mx-auto px-5 h-14 flex items-center justify-between">
+          <span className="text-lg font-extrabold text-[#191f28] tracking-tight">Curio</span>
+          <div className="flex items-center gap-1.5">
             <button
               onClick={() => setShowModal(true)}
-              className="text-sm bg-[#FEE500] hover:bg-[#F0D800] text-gray-900 font-medium px-3 py-1.5 rounded-lg transition-colors"
+              className="flex items-center gap-1.5 bg-[#FEE500] hover:bg-[#F5DB00] text-[#191f28] text-sm font-bold px-3.5 py-2 rounded-full transition-colors"
             >
-              봇 연동
+              <span>💬</span>
+              <span>봇 연동</span>
             </button>
-            <button onClick={handleLogout} className="text-sm text-gray-400 hover:text-gray-600">로그아웃</button>
+            <button
+              onClick={handleLogout}
+              className="text-sm font-medium text-[#8b95a1] hover:text-[#4e5968] px-3 py-2 rounded-full hover:bg-black/[0.03] transition-colors"
+            >
+              로그아웃
+            </button>
           </div>
         </div>
       </header>
 
-      {/* 아이템 목록 */}
-      <main className="max-w-2xl mx-auto px-4 py-6">
-        {items.length === 0 && !loading ? (
-          <div className="text-center py-20 text-gray-400">
-            <p className="text-4xl mb-3">📭</p>
-            <p className="text-sm">아직 저장된 아이템이 없어요.</p>
-            <p className="text-sm">카카오톡 채널에 링크나 텍스트를 보내보세요!</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {items.map(item => <ItemCard key={item.id} item={item} />)}
-          </div>
-        )}
+      <main className="max-w-2xl mx-auto px-5 pb-16">
+        {/* 타이틀 */}
+        <div className="pt-8 pb-5">
+          <h1 className="text-[26px] font-extrabold text-[#191f28] tracking-tight">내 아카이브</h1>
+          <p className="text-sm text-[#8b95a1] mt-1">저장한 글 {totalCount}개</p>
+        </div>
 
-        {loading && (
-          <p className="text-center text-gray-400 text-sm py-8">불러오는 중...</p>
-        )}
+        {/* 카테고리 필터 (sticky) */}
+        <div className="sticky top-14 z-10 -mx-5 px-5 py-2.5 bg-[#f2f4f6]/85 backdrop-blur-md">
+          <div className="flex gap-2 overflow-x-auto no-scrollbar">
+            {CATEGORIES.map(({ key, label }) => {
+              const active = key === category
+              return (
+                <button
+                  key={label}
+                  onClick={() => handleCategory(key)}
+                  className={`shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-colors ${
+                    active
+                      ? 'bg-[#191f28] text-white'
+                      : 'bg-white text-[#4e5968] hover:bg-[#f2f4f6] border border-[#e5e8eb]'
+                  }`}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
 
-        {!loading && hasMore && items.length > 0 && (
-          <button
-            onClick={handleLoadMore}
-            className="w-full mt-6 py-3 text-sm text-gray-500 hover:text-gray-800 border border-gray-200 rounded-xl transition-colors"
-          >
-            더 보기
-          </button>
-        )}
+        {/* 리스트 */}
+        <div className="space-y-3 pt-3">
+          {items.length === 0 && !loading ? (
+            <div className="text-center py-24 text-[#8b95a1]">
+              <p className="text-5xl mb-4">📭</p>
+              <p className="text-[15px] font-semibold text-[#4e5968]">
+                {category ? '이 카테고리엔 저장된 글이 없어요.' : '아직 저장된 아이템이 없어요.'}
+              </p>
+              <p className="text-sm mt-1.5">카카오톡 채널에 링크나 텍스트를 보내보세요!</p>
+            </div>
+          ) : (
+            items.map(item => <ItemCard key={item.id} item={item} />)
+          )}
+
+          {loading && (
+            <p className="text-center text-[#8b95a1] text-sm py-8">불러오는 중...</p>
+          )}
+
+          {!loading && hasMore && items.length > 0 && (
+            <button
+              onClick={handleLoadMore}
+              className="w-full py-3.5 text-sm font-semibold text-[#4e5968] bg-white hover:bg-[#f2f4f6] rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-colors"
+            >
+              더 보기
+            </button>
+          )}
+        </div>
       </main>
     </div>
   )
