@@ -2,26 +2,17 @@ import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import useAuthStore from '../store/authStore'
 
+// 토큰은 URL에 실리지 않는다. 카카오 콜백으로 백엔드가 refresh 쿠키를 심어둔 상태이고,
+// App 부팅 시 reissue로 access 토큰까지 복구된 뒤 이 화면이 렌더된다 → 상태만 보고 분기.
 function AuthCallbackPage() {
   const navigate = useNavigate()
-  const setAuth = useAuthStore((state) => state.setAuth)
+  const accessToken = useAuthStore((s) => s.accessToken)
   const processed = useRef(false)
 
   useEffect(() => {
     if (processed.current) return
     processed.current = true
-
-    const params = new URLSearchParams(window.location.search)
-    const accessToken = params.get('accessToken')
-    const refreshToken = params.get('refreshToken')
-
-    if (accessToken && refreshToken) {
-      localStorage.setItem('refreshToken', refreshToken)
-      setAuth(null, accessToken)
-      navigate('/', { replace: true })
-    } else {
-      navigate('/login', { replace: true })
-    }
+    navigate(accessToken ? '/' : '/login', { replace: true })
   }, [])
 
   return (

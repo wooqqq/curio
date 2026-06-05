@@ -11,7 +11,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.Map;
 
 @Service
@@ -36,19 +35,10 @@ public class AuthService {
             throw new CurioException(ErrorCode.EXPIRED_TOKEN);
         }
 
-        User user = stored.getUser();
-
-        // refresh token rotation
-        refreshTokenRepository.delete(stored);
-        String newAccessToken = jwtUtil.generateAccessToken(user.getId());
-        String newRefreshToken = jwtUtil.generateRefreshToken(user.getId());
-        refreshTokenRepository.save(RefreshToken.builder()
-                .user(user)
-                .token(newRefreshToken)
-                .expiredAt(LocalDateTime.now().plusSeconds(jwtUtil.getRefreshExpiration() / 1000))
-                .build());
-
-        return Map.of("accessToken", newAccessToken, "refreshToken", newRefreshToken);
+        // 회전 없이 access 토큰만 새로 발급한다. refresh 토큰은 만료/로그아웃까지 그대로 유지.
+        // (매 페이지 로드마다 회전하면 새로고침 연타·멀티탭에서 race로 로그아웃되던 문제 제거)
+        String newAccessToken = jwtUtil.generateAccessToken(stored.getUser().getId());
+        return Map.of("accessToken", newAccessToken, "refreshToken", refreshToken);
     }
 
     @Transactional

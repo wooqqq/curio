@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.UUID;
 
 @Component
 public class JwtUtil {
@@ -60,6 +61,9 @@ public class JwtUtil {
     private String generate(Long userId, SecretKey key, long expiration) {
         Date now = new Date();
         return Jwts.builder()
+                // jti: 같은 유저를 같은 초에 발급해도 토큰이 절대 겹치지 않게 한다.
+                // (refresh_tokens.token UNIQUE + 회전 시 insert-before-delete 충돌 방지)
+                .id(UUID.randomUUID().toString())
                 .subject(String.valueOf(userId))
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + expiration))

@@ -1,7 +1,7 @@
 import client from './client'
 
-export const reissueToken = (refreshToken) =>
-  client.post('/auth/reissue', { refreshToken })
+export const reissueToken = () =>
+  client.post('/auth/reissue', null, { _skipAuthRetry: true })
 
 export const logout = () =>
   client.post('/auth/logout')

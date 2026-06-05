@@ -36,6 +36,12 @@ openai:
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
 
+# refresh 토큰 쿠키 (로컬은 http라 Secure off, 같은 사이트라 Lax)
+cookie:
+  secure: ${COOKIE_SECURE:false}
+  same-site: ${COOKIE_SAME_SITE:Lax}
+  domain: ${COOKIE_DOMAIN:}
+
 logging:
   level:
     com.curio: DEBUG
