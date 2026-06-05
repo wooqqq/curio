@@ -8,6 +8,7 @@ import com.curio.exception.CurioException;
 import com.curio.exception.ErrorCode;
 import com.curio.repository.ItemRepository;
 import com.curio.repository.UserRepository;
+import com.curio.service.ItemClassifier;
 import com.curio.service.OgCrawlerService;
 import com.curio.service.S3Service;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +24,6 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class ItemProcessor {
 
-    private static final int MIN_TEXT_LENGTH_FOR_AI = 20;
     private static final Pattern URL_PATTERN =
             Pattern.compile("https?://[^\\s]+", Pattern.CASE_INSENSITIVE);
     private static final Pattern IMAGE_URL_PATTERN =
@@ -33,6 +33,7 @@ public class ItemProcessor {
     private final ItemRepository itemRepository;
     private final OgCrawlerService ogCrawlerService;
     private final S3Service s3Service;
+    private final ItemClassifier itemClassifier;
 
     @Transactional
     public void process(Long userId, String utterance) {
@@ -70,8 +71,9 @@ public class ItemProcessor {
                 .normalizedUrl(normalized)
                 .build();
 
+        itemClassifier.classify(item);
         itemRepository.save(item);
-        log.info("LINK saved: userId={} title={}", user.getId(), og.title());
+        log.info("LINK saved: userId={} title={} category={}", user.getId(), og.title(), item.getCategory());
     }
 
     private void processImage(User user, String imageUrl) {
@@ -87,6 +89,7 @@ public class ItemProcessor {
                 .s3Key(s3Key)
                 .build();
 
+        itemClassifier.classify(item);
         itemRepository.save(item);
         log.info("IMAGE saved: userId={}", user.getId());
     }
@@ -99,6 +102,7 @@ public class ItemProcessor {
                 .content(text)
                 .build();
 
+        itemClassifier.classify(item);
         itemRepository.save(item);
         log.info("TEXT saved: userId={}", user.getId());
     }

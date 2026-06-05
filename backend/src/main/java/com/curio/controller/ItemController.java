@@ -9,6 +9,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/v1/items")
 @RequiredArgsConstructor
@@ -33,5 +35,11 @@ public class ItemController {
             @PathVariable Long id
     ) {
         return ApiResponse.success(itemService.recrawl(userId, id));
+    }
+
+    /** 분류 안 된(category=null) 아이템 일괄 재분류. AI 키를 켠 뒤 한 번 호출하는 백필용. */
+    @PostMapping("/reclassify-all")
+    public ApiResponse<Map<String, Integer>> reclassifyAll(@AuthenticationPrincipal Long userId) {
+        return ApiResponse.success(Map.of("reclassified", itemService.reclassifyAll(userId)));
     }
 }

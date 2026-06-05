@@ -9,8 +9,13 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
+
 public interface ItemRepository extends JpaRepository<Item, Long> {
     boolean existsByUserAndNormalizedUrl(User user, String normalizedUrl);
+
+    /** 아직 분류되지 않은(category=null) 유저 아이템 — 재분류 백필용. */
+    List<Item> findByUserIdAndCategoryIsNull(Long userId);
 
     /**
      * 사용자 아이템 조회 (카테고리 필터 + 키워드 검색).

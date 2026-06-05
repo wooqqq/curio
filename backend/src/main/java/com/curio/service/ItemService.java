@@ -14,6 +14,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -21,6 +23,7 @@ public class ItemService {
 
     private final ItemRepository itemRepository;
     private final OgCrawlerService ogCrawlerService;
+    private final ItemClassifier itemClassifier;
 
     public Page<ItemResponse> getItems(Long userId, Category category, String q, int page, int size) {
         PageRequest pageable = PageRequest.of(page, size);
@@ -48,5 +51,16 @@ public class ItemService {
         OgData og = ogCrawlerService.crawl(item.getOriginalUrl());
         item.updateLinkMetadata(og.title(), og.description(), og.thumbnailUrl());
         return ItemResponse.from(item);
+    }
+
+    /**
+     * 아직 분류되지 않은(category=null) 아이템을 AI로 일괄 재분류한다.
+     * AI 분류 기능을 나중에 켰을 때, 그 전에 쌓인 아이템을 채우는 백필용. 처리한 개수를 반환.
+     */
+    @Transactional
+    public int reclassifyAll(Long userId) {
+        List<Item> items = itemRepository.findByUserIdAndCategoryIsNull(userId);
+        items.forEach(itemClassifier::classify);
+        return items.size();
     }
 }

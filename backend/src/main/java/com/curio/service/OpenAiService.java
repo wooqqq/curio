@@ -49,6 +49,11 @@ public class OpenAiService {
             Return ONLY valid JSON, no explanation.
             """;
 
+    /** API 키가 설정돼 실제 분류가 가능한지. 키가 없으면 호출자가 분류를 미룬다. */
+    public boolean isEnabled() {
+        return StringUtils.hasText(apiKey);
+    }
+
     public ClassificationResult classify(String title, String content) {
         if (!StringUtils.hasText(apiKey)) {
             log.debug("OpenAI API key not configured, using default classification");
