@@ -15,14 +15,15 @@
 - 장점: 카카오 쪽 요청을 우리가 직접 다루니 디버깅이 명확하다.
 - 아쉬운 점: OAuth2 Client가 자동으로 해주던 부분(state 검증 등)을 직접 챙겨야 한다. 다른 소셜 로그인을 붙이면 보일러플레이트가 늘어난다.
 
-## 2. JWT Access/Refresh + Refresh를 DB에 저장 (rotation)
+## 2. JWT Access/Refresh + Refresh를 DB에 저장
 
 Access는 짧게, Refresh로 재발급하는 표준 구조. 다만 Refresh 토큰을 stateless하게 두지 않고 `refresh_tokens` 테이블에 저장한다.
 
-이유는 두 가지다. 재발급 시 기존 Refresh를 지우고 새로 발급하는 **rotation**을 하려면 서버가 "현재 유효한 Refresh"를 알아야 하고(`AuthService.reissue`에서 기존 토큰 삭제 후 재발급), 로그아웃 시 서버에서 토큰을 무효화해야 하기 때문이다(`logout`에서 유저의 Refresh 삭제). 순수 stateless JWT로는 로그아웃·강제 만료가 안 된다.
+이유는 서버가 "현재 유효한 Refresh"를 알아야 하기 때문이다. 재발급 시 토큰이 실제로 살아있는지 확인하고(`AuthService.reissue`), 로그아웃 시 서버에서 토큰을 무효화한다(`logout`에서 유저의 Refresh 삭제). 순수 stateless JWT로는 로그아웃·강제 만료가 안 된다.
 
-- 아쉬운 점: 재발급마다 DB 조회/쓰기가 든다. 트래픽이 커지면 Redis로 옮기는 게 맞다.
-- 알려진 빚: 로그인 콜백에서 토큰을 URL 쿼리로 프론트에 넘긴다(`/auth/callback?accessToken=...`). 배포 전에 httpOnly 쿠키나 일회성 code 교환으로 바꿔야 한다.
+- 아쉬운 점: 재발급마다 DB 조회가 든다. 트래픽이 커지면 Redis로 옮기는 게 맞다.
+- 후속: 처음엔 재발급 때 Refresh를 갈아끼우는 **rotation**도 했지만, 콜백 직후·새로고침마다 재발급을 호출하는 구조와 맞물려 race로 멀쩡한 세션이 로그아웃되는 문제가 생겨 rotation은 걷어냈다. 자세한 건 #11.
+- 해소된 빚: 콜백에서 토큰을 URL 쿼리로 넘기던 방식은 #11에서 httpOnly 쿠키로 교체했다.
 
 ## 3. 카카오 챗봇 5초 제한 → 즉시 응답 후 비동기 처리
 
@@ -90,6 +91,24 @@ AI에 맡길 수도 있었지만 타입 판별 같은 단순 분기에 LLM 호�
 스키마를 Hibernate `update`로 자동 반영한다. 초반에 엔티티가 자주 바뀌는 동안 마이그레이션 파일을 매번 쓰는 부담을 덜려고 택했다.
 
 - 아쉬운 점: 운영에선 위험하다(컬럼 삭제·타입 변경을 update가 안전하게 처리 못 함). 배포 단계에서 Flyway 같은 마이그레이션 도구로 전환할 예정.
+
+## 11. OAuth 토큰 전달을 httpOnly 쿠키 + 메모리 access로
+
+처음엔 로그인 콜백에서 access·refresh를 둘 다 URL 쿼리로 프론트에 넘기고(`/auth/callback?accessToken=...&refreshToken=...`), 프론트는 둘 다 `localStorage`에 저장했다. 동작은 했지만 노출 표면이 두 겹이었다. 토큰이 URL에 실리면 브라우저 히스토리·서버 액세스 로그·Referer 헤더에 남고, `localStorage`는 JS가 다 읽을 수 있어 XSS 한 번이면 장수명 refresh까지 털린다.
+
+배포 전 마지막 보안 작업으로 다음과 같이 바꿨다.
+
+- **refresh = httpOnly 쿠키.** 콜백에서 `Set-Cookie: HttpOnly; Secure; SameSite; Path=/api/v1/auth`로 내려주고 URL엔 토큰을 싣지 않는다(`CookieUtil`, `AuthController.kakaoCallback`). JS(`document.cookie`)로 못 읽으니 XSS로 탈취 불가. Path를 auth 경로로 좁혀 일반 API 요청엔 안 실리게 했다(CSRF 표면 축소).
+- **access = 메모리(zustand).** `localStorage`를 아예 안 쓴다. 새로고침하면 메모리가 비므로, 앱 부팅 때 refresh 쿠키로 `/reissue`를 1회 호출해 access를 복구한다(`App.jsx`). 복구가 끝나기 전엔 라우팅 판단을 보류한다(`bootstrapped` 플래그).
+- **쿠키 속성은 프로필별로.** dev는 http라 `Secure=false`, prod는 `Secure=true`. 같은 사이트(`mycurio.kr`/`api.mycurio.kr`)면 `SameSite=Lax`로 충분하고, 완전히 다른 도메인 배포면 `SameSite=None`이 필요해 배포 토폴로지가 정해질 때 확정한다.
+
+대안으로 "일회성 code 교환"(토큰을 Redis에 짧은 code로 저장하고 URL엔 code만)도 검토했지만, 그건 URL 노출만 가리고 `localStorage`-XSS 노출은 그대로 남는 절반짜리라 택하지 않았다.
+
+이 과정에서 두 가지를 더 손봤다.
+- **rotation 제거.** 콜백 직후·새로고침마다 `/reissue`가 도는 새 구조에서 rotation(기존 refresh 삭제 후 재발급)을 유지하니, 빠른 새로고침·멀티탭에서 한 요청이 막 회전시켜 지운 토큰을 다른 요청이 들고 와 `REFRESH_TOKEN_NOT_FOUND`로 로그아웃되는 race가 났다. reissue는 access만 새로 발급하고 refresh는 만료까지 유지하도록 바꿔 race를 없앴다. 제대로 된 rotation은 토큰 패밀리·재사용 감지까지 가야 하는 영역이라, MVP에선 득보다 실이 컸다.
+- **JWT에 jti(UUID) 추가.** Refresh JWT가 `{sub, iat(초), exp}`뿐이라 같은 유저를 같은 초에 발급하면 토큰 문자열이 byte 단위로 동일했다. 콜백이 막 만든 토큰과 직후 reissue가 만든 토큰이 겹쳐 `token` UNIQUE 제약에 걸렸다(Hibernate가 한 트랜잭션에서 INSERT를 DELETE보다 먼저 실행해 터졌다). 모든 토큰에 고유 `jti`를 넣어 충돌을 원천 차단했다. (별도 TIL로도 정리)
+
+- 아쉬운 점: access를 메모리에만 두니 새로고침마다 `/reissue` 왕복이 한 번 더 든다(부팅 직전 짧은 로딩). 보안과 맞바꾼 비용이라 수용했다. rotation을 뺐으니 refresh 토큰 탈취 시 자동 감지(재사용 탐지)는 없다 — httpOnly로 탈취 가능성 자체를 낮추는 쪽에 무게를 뒀다.
 
 ---
 

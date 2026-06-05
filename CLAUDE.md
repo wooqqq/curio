@@ -23,7 +23,7 @@ AI 세션 간 컨텍스트 유지용 문서. 새 세션 시작 시 이 파일부
 | DB | MySQL 8 (Docker Compose 로컬) |
 | 캐시/큐 | Redis |
 | ORM | Hibernate JPA (ddl-auto: update) |
-| 인증 | 카카오 OAuth2 + JWT (Access/Refresh rotation) |
+| 인증 | 카카오 OAuth2 + JWT (Access 메모리 / Refresh httpOnly 쿠키) |
 | AI | OpenAI gpt-4.1-mini |
 | 파일 | AWS S3 (키: userId/yyyy/MM/uuid.png) |
 | API 문서 | SpringDoc OpenAPI (Swagger) |
@@ -67,7 +67,7 @@ curio/                          ← 모노레포 루트
         ├── processor/          ← ItemProcessor (크롤링, AI, 저장)
         ├── controller/
         ├── exception/          ← GlobalExceptionHandler, ErrorCode
-        └── security/           ← JwtFilter, JwtUtil
+        └── security/           ← JwtFilter, JwtUtil, CookieUtil
 ```
 
 ---
