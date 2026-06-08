@@ -1,3 +1,7 @@
+server:
+  # 배포 플랫폼(Railway 등)이 주입하는 PORT 사용, 로컬은 8080
+  port: ${PORT:8080}
+
 spring:
   application:
     name: curio
@@ -23,6 +27,18 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
     operations-sorter: alpha
+
+# 헬스체크: 배포 플랫폼(Railway 등)이 새 컨테이너 정상 여부를 확인 → 무중단 롤링 배포
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
 
 api:
   prefix: /api/v1
