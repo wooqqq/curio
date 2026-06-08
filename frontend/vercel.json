@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://REPLACE_WITH_RAILWAY_BACKEND_URL/api/:path*"
+      "destination": "https://curio-production-1728.up.railway.app/api/:path*"
     },
     {
       "source": "/(.*)",
