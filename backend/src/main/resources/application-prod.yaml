@@ -23,14 +23,14 @@ kakao:
   user-info-uri: https://kapi.kakao.com/v2/user/me
 
 aws:
-  access-key: ${AWS_ACCESS_KEY}
-  secret-key: ${AWS_SECRET_KEY}
+  access-key: ${AWS_ACCESS_KEY:}
+  secret-key: ${AWS_SECRET_KEY:}
   region: ${AWS_REGION:ap-northeast-2}
   s3:
-    bucket: ${S3_BUCKET_NAME}
+    bucket: ${S3_BUCKET_NAME:}
 
 openai:
-  api-key: ${OPENAI_API_KEY}
+  api-key: ${OPENAI_API_KEY:}
   model: gpt-4.1-mini
 
 cors:
