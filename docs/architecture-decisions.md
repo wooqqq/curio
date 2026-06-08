@@ -110,6 +110,25 @@ AI에 맡길 수도 있었지만 타입 판별 같은 단순 분기에 LLM 호�
 
 - 아쉬운 점: access를 메모리에만 두니 새로고침마다 `/reissue` 왕복이 한 번 더 든다(부팅 직전 짧은 로딩). 보안과 맞바꾼 비용이라 수용했다. rotation을 뺐으니 refresh 토큰 탈취 시 자동 감지(재사용 탐지)는 없다 — httpOnly로 탈취 가능성 자체를 낮추는 쪽에 무게를 뒀다.
 
+## 12. 배포는 Railway(백엔드) + Vercel(프론트), EC2 대신
+
+원래는 AWS EC2 프리티어를 막연히 생각했다. 그런데 AWS가 2025년 7월부터 신규 계정 프리티어를 "12개월 always-free"에서 "6개월 크레딧"으로 바꿔서, 2026년에 만든 이 계정은 EC2를 올려도 사실상 6개월 뒤 과금이다. 게다가 EC2는 t2.micro 1GB에 Spring Boot + MySQL + Redis를 올리면 메모리가 빠듯해 swap·nginx·certbot까지 직접 챙겨야 한다.
+
+개인 프로젝트의 목표가 "동작하는 서비스를 빨리 띄워 포트폴리오로 쓰는 것"이라, 인프라 관리가 거의 없는 **Railway**(Docker 자동 빌드, MySQL·Redis 애드온)로 백엔드를, **Vercel**로 프론트를 올렸다. 코드는 환경변수로 전부 분리돼 있어, 나중에 인프라 학습용으로 EC2 이전을 따로 하더라도 설정만 옮기면 된다(코드 변경 0).
+
+배포하면서 로컬 Docker에선 멀쩡하던 게 Railway에서 줄줄이 터졌는데, 전부 "로컬 ↔ 매니지드 환경 차이"였다. MySQL은 Railway 내부 네트워크가 SSL을 안 써서 `useSSL=false&allowPublicKeyRetrieval=true`로 맞춰야 했고, Redis는 로컬과 달리 비번 인증을 요구했고(NOAUTH), DB 접속 정보는 로컬 `.env` 값이 아니라 `${{MySQL.*}}` 참조여야 했다. 그 과정에서 prod 설정 원칙도 하나 세웠다 — **선택 통합(AWS·OpenAI)은 `${VAR:}` 빈 기본값을 줘 미설정이어도 부팅되게(기능만 꺼짐), 필수 설정(CORS·카카오 리다이렉트)은 기본값 없이 빨리 실패하게** 둔다. dev는 모든 값에 기본값이 있어 안 드러나던 문제다.
+
+- 아쉬운 점: Railway·Vercel 무료 한도를 넘기면 과금되고, 백엔드+MySQL+Redis 3개라 크레딧을 빠르게 쓴다. 매니지드라 인프라를 직접 다루는 학습은 EC2 이전 때로 미뤘다.
+
+## 13. 프론트–백엔드를 Vercel 프록시로 묶어 same-origin 쿠키 유지
+
+#11에서 refresh를 httpOnly 쿠키로 옮기면서, "프론트(vercel.app)와 백엔드(railway.app)가 완전히 다른 도메인이면 cross-site라 `SameSite=None; Secure`가 필요하고 CORS도 credentials 모드로 풀어야 한다"는 숙제가 남아 있었다. SameSite=None은 서드파티 쿠키 취급이라 브라우저 정책에 더 취약하다.
+
+이걸 도메인을 사는 대신 **Vercel 리라이트 프록시**로 풀었다. `frontend/vercel.json`에서 `/api/*`를 Railway 백엔드로 프록시하면, 브라우저 입장에선 모든 요청이 vercel.app 한 출처로 나간다. 그래서 refresh 쿠키가 **first-party(SameSite=Lax)**로 그대로 동작하고, 카카오 콜백도 vercel.app을 거쳐 쿠키가 first-party로 깔린다. 결과적으로 SameSite=None도, CORS credentials도, 프론트 API 클라이언트의 baseURL 변경(`/api/v1` 상대경로 유지)도 필요 없었다.
+
+- 이유: 같은 출처로 만들면 쿠키 보안 모델이 가장 단순하고 깨질 구석이 적다. 도메인 구매(mycurio.kr)를 배포 필수 선결조건에서 떼어낼 수 있던 것도 컸다.
+- 아쉬운 점: 모든 API가 Vercel을 한 번 더 경유해 약간의 지연이 붙는다. 그리고 `vercel.json`의 프록시 대상에 Railway 주소가 박혀 있어, 백엔드 주소가 바뀌면 이 파일도 같이 고쳐야 한다.
+
 ---
 
 ## 봇 연동 코드 흐름 (참고)
