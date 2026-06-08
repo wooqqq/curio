@@ -20,6 +20,8 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      # 로컬 Redis는 비번 없음(빈 값=인증 안 함), Railway Redis는 비번 필요
+      password: ${REDIS_PASSWORD:}
 
 springdoc:
   api-docs:
