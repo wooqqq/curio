@@ -28,7 +28,7 @@ AI 세션 간 컨텍스트 유지용 문서. 새 세션 시작 시 이 파일부
 | 파일 | AWS S3 (키: userId/yyyy/MM/uuid.png) |
 | API 문서 | SpringDoc OpenAPI (Swagger) |
 | 프론트 | React + Vite, Tailwind CSS, Zustand |
-| 배포 | 백엔드: AWS EC2 or Railway / 프론트: Vercel |
+| 배포 | 백엔드: Railway(Docker) / 프론트: Vercel / CI: GitHub Actions |
 
 ---
 
@@ -103,6 +103,17 @@ curio/                          ← 모노레포 루트
 
 ---
 
+## 배포 (운영)
+
+- 백엔드: Railway — `https://curio-production-1728.up.railway.app` (Docker, `/actuator/health`)
+- 프론트: Vercel — `https://curio-three-ashy.vercel.app`
+- 프론트가 `/api/*`를 Railway로 프록시(`frontend/vercel.json`) → 같은 출처라 refresh 쿠키 first-party
+- 카카오봇 스킬 URL = Railway `/api/v1/kakao/skill` (ngrok 불필요)
+- 배포 절차·환경변수 체크리스트는 루트 `DEPLOY.md`
+- 브랜치 흐름: `develop` 작업 → `main` 머지 = 자동 배포 (Railway/Vercel이 main 추적), CI는 GitHub Actions
+
+---
+
 ## 구현 단계 현황
 
 | Phase | 내용 | 상태 |
@@ -112,7 +123,7 @@ curio/                          ← 모노레포 루트
 | Phase 3 | 핵심 파이프라인 | ✅ 완료 |
 | Phase 4 | 웹 아카이브 UI | ✅ 완료 |
 | Phase 5 | 검색 | ✅ 완료 |
-| Phase 6 | 배포 | ⏳ 대기 |
+| Phase 6 | 배포 | ✅ 완료 (Railway + Vercel, 로그인·저장 E2E 검증) |
 
 ---
 
