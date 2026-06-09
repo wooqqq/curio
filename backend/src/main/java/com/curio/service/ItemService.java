@@ -54,6 +54,22 @@ public class ItemService {
     }
 
     /**
+     * 아이템을 삭제한다. 본인 소유가 아니면 ITEM_NOT_FOUND (존재 여부를 노출하지 않는다).
+     * item_tags 조인 행은 함께 지워지고, 공유 자원인 Tag 자체는 남는다.
+     */
+    @Transactional
+    public void delete(Long userId, Long itemId) {
+        Item item = itemRepository.findById(itemId)
+                .orElseThrow(() -> new CurioException(ErrorCode.ITEM_NOT_FOUND));
+
+        if (!item.getUser().getId().equals(userId)) {
+            throw new CurioException(ErrorCode.ITEM_NOT_FOUND);
+        }
+
+        itemRepository.delete(item);
+    }
+
+    /**
      * 아직 분류되지 않은(category=null) 아이템을 AI로 일괄 재분류한다.
      * AI 분류 기능을 나중에 켰을 때, 그 전에 쌓인 아이템을 채우는 백필용. 처리한 개수를 반환.
      */

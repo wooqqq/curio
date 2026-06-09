@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { getItems, recrawlItem } from '../api/items'
+import { getItems, recrawlItem, deleteItem } from '../api/items'
 import { logout } from '../api/auth'
 import client from '../api/client'
 import useAuthStore from '../store/authStore'
@@ -120,9 +120,10 @@ function LinkCodeModal({ onClose }) {
   )
 }
 
-function ItemCard({ item, onRecrawl }) {
+function ItemCard({ item, onRecrawl, onDelete }) {
   const [recrawling, setRecrawling] = useState(false)
   const [recrawlError, setRecrawlError] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const domain = getDomain(item.originalUrl)
   const source = domain || SOURCE_LABEL[item.type] || '링크'
   const clickable = Boolean(item.originalUrl)
@@ -147,6 +148,20 @@ function ItemCard({ item, onRecrawl }) {
     }
   }
 
+  const handleDelete = async (e) => {
+    e.stopPropagation()
+    if (deleting) return
+    if (!window.confirm('이 아이템을 삭제할까요?')) return
+    setDeleting(true)
+    try {
+      await onDelete(item.id)
+      // 성공 시 부모가 목록에서 제거 → 카드 언마운트 (상태 복구 불필요)
+    } catch {
+      setDeleting(false)
+      alert('삭제하지 못했어요. 잠시 후 다시 시도해주세요.')
+    }
+  }
+
   return (
     <div
       onClick={handleClick}
@@ -161,6 +176,17 @@ function ItemCard({ item, onRecrawl }) {
           <span className="truncate">{source}</span>
           <span className="text-[#d1d6db]">·</span>
           <span className="shrink-0">{timeAgo(item.createdAt)}</span>
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            aria-label="삭제"
+            className="ml-auto shrink-0 -my-1 flex h-7 w-7 items-center justify-center rounded-full text-[#b0b8c1] hover:text-[#f04452] hover:bg-[#f04452]/10 disabled:opacity-40 transition-colors"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6" />
+              <path d="M10 11v6M14 11v6" />
+            </svg>
+          </button>
         </div>
 
         <p className="text-[15px] font-bold text-[#191f28] leading-snug line-clamp-2 mb-1">
@@ -261,6 +287,12 @@ function ArchivePage() {
     const res = await recrawlItem(id)
     const updated = res.data
     setItems(prev => prev.map(it => (it.id === id ? updated : it)))
+  }, [])
+
+  const handleDelete = useCallback(async (id) => {
+    await deleteItem(id)
+    setItems(prev => prev.filter(it => it.id !== id))
+    setTotalCount(c => Math.max(0, c - 1))
   }, [])
 
   const handleLogout = async () => {
@@ -364,7 +396,7 @@ function ArchivePage() {
               </p>
             </div>
           ) : (
-            items.map(item => <ItemCard key={item.id} item={item} onRecrawl={handleRecrawl} />)
+            items.map(item => <ItemCard key={item.id} item={item} onRecrawl={handleRecrawl} onDelete={handleDelete} />)
           )}
 
           {loading && (
