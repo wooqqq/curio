@@ -15,6 +15,9 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        # 아이템 목록 매핑 시 태그(@ManyToMany lazy)를 아이템마다 따로 조회하던 N+1을
+        # ID IN (...) 묶음 조회로 줄인다. 페이지네이션과 충돌하는 fetch join 대신 사용.
+        default_batch_fetch_size: 100
 
   data:
     redis:
