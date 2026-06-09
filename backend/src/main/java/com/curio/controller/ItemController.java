@@ -37,6 +37,15 @@ public class ItemController {
         return ApiResponse.success(itemService.recrawl(userId, id));
     }
 
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> delete(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long id
+    ) {
+        itemService.delete(userId, id);
+        return ApiResponse.success();
+    }
+
     /** 분류 안 된(category=null) 아이템 일괄 재분류. AI 키를 켠 뒤 한 번 호출하는 백필용. */
     @PostMapping("/reclassify-all")
     public ApiResponse<Map<String, Integer>> reclassifyAll(@AuthenticationPrincipal Long userId) {
