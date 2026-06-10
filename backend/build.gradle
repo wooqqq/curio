@@ -13,6 +13,12 @@ java {
 	}
 }
 
+// 소스 인코딩 UTF-8 고정. Windows 로컬 빌드 기본값(MS949)에서 한글 메시지가
+// 깨지는 것을 방지(리눅스 Docker 빌드는 기본 UTF-8이라 영향 없음).
+tasks.withType(JavaCompile).configureEach {
+	options.encoding = 'UTF-8'
+}
+
 repositories {
 	mavenCentral()
 }
