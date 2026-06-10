@@ -7,6 +7,7 @@ import com.curio.entity.enums.Category;
 import com.curio.entity.enums.ItemType;
 import com.curio.exception.CurioException;
 import com.curio.exception.ErrorCode;
+import com.curio.processor.ItemProcessor;
 import com.curio.repository.ItemRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -24,6 +25,16 @@ public class ItemService {
     private final ItemRepository itemRepository;
     private final OgCrawlerService ogCrawlerService;
     private final ItemClassifier itemClassifier;
+    private final ItemProcessor itemProcessor;
+
+    /**
+     * 웹앱에서 링크를 직접 추가한다(봇 없이 저장). 동기 처리 후 저장된 아이템을 반환.
+     * 클래스 기본값이 readOnly라, 쓰기 트랜잭션을 위해 메서드에 @Transactional을 다시 건다.
+     */
+    @Transactional
+    public ItemResponse addLink(Long userId, String url) {
+        return itemProcessor.addLink(userId, url);
+    }
 
     public Page<ItemResponse> getItems(Long userId, Category category, String q, int page, int size) {
         PageRequest pageable = PageRequest.of(page, size);
