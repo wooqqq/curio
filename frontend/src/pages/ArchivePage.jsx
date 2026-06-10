@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import { getItems, recrawlItem, deleteItem } from '../api/items'
 import { logout } from '../api/auth'
+import { checkAdmin } from '../api/admin'
 import client from '../api/client'
 import useAuthStore from '../store/authStore'
+import PopupModal from '../components/PopupModal'
 
 const TYPE_ICON = {
   LINK: '🔗',
@@ -250,7 +253,13 @@ function ArchivePage() {
   const [hasMore, setHasMore] = useState(true)
   const [loading, setLoading] = useState(false)
   const [showModal, setShowModal] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
   const logoutStore = useAuthStore(s => s.logout)
+
+  // 관리자면 헤더에 관리자 페이지 링크 노출 (백엔드도 /admin 접근을 별도 검증)
+  useEffect(() => {
+    checkAdmin().then(res => setIsAdmin(res.data.admin)).catch(() => {})
+  }, [])
 
   const fetchItems = useCallback(async (pg, cat, query) => {
     setLoading(true)
@@ -304,12 +313,27 @@ function ArchivePage() {
   return (
     <div className="min-h-screen bg-[#f2f4f6]">
       {showModal && <LinkCodeModal onClose={() => setShowModal(false)} />}
+      <PopupModal />
 
       {/* 헤더 (frosted) */}
       <header className="sticky top-0 z-20 bg-[#f2f4f6]/80 backdrop-blur-md border-b border-black/[0.04]">
         <div className="max-w-2xl mx-auto px-5 h-14 flex items-center justify-between">
           <span className="text-lg font-extrabold text-[#191f28] tracking-tight">Curio</span>
           <div className="flex items-center gap-1.5">
+            <Link
+              to="/announcements"
+              className="text-sm font-medium text-[#8b95a1] hover:text-[#4e5968] px-3 py-2 rounded-full hover:bg-black/[0.03] transition-colors"
+            >
+              공지
+            </Link>
+            {isAdmin && (
+              <Link
+                to="/admin"
+                className="text-sm font-medium text-[#8b95a1] hover:text-[#4e5968] px-3 py-2 rounded-full hover:bg-black/[0.03] transition-colors"
+              >
+                관리자
+              </Link>
+            )}
             <button
               onClick={() => setShowModal(true)}
               className="flex items-center gap-1.5 bg-[#FEE500] hover:bg-[#F5DB00] text-[#191f28] text-sm font-bold px-3.5 py-2 rounded-full transition-colors"

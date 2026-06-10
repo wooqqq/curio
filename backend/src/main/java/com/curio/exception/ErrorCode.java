@@ -27,7 +27,16 @@ public enum ErrorCode {
 
     // Kakao Bot
     BOT_USER_NOT_LINKED(HttpStatus.FORBIDDEN, "BOT_USER_NOT_LINKED", "카카오 봇 계정 연동이 필요합니다."),
-    INVALID_LINK_CODE(HttpStatus.BAD_REQUEST, "INVALID_LINK_CODE", "유효하지 않거나 만료된 연동 코드입니다.");
+    INVALID_LINK_CODE(HttpStatus.BAD_REQUEST, "INVALID_LINK_CODE", "유효하지 않거나 만료된 연동 코드입니다."),
+
+    // Announcement / Popup
+    ANNOUNCEMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "ANNOUNCEMENT_NOT_FOUND", "공지를 찾을 수 없습니다."),
+    POPUP_NOT_FOUND(HttpStatus.NOT_FOUND, "POPUP_NOT_FOUND", "팝업을 찾을 수 없습니다."),
+
+    // Upload
+    INVALID_IMAGE(HttpStatus.BAD_REQUEST, "INVALID_IMAGE", "이미지 파일이 올바르지 않습니다."),
+    S3_NOT_CONFIGURED(HttpStatus.SERVICE_UNAVAILABLE, "S3_NOT_CONFIGURED", "이미지 저장소(S3)가 설정되지 않았습니다."),
+    UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "UPLOAD_FAILED", "이미지 업로드에 실패했습니다.");
 
     private final HttpStatus httpStatus;
     private final String code;
