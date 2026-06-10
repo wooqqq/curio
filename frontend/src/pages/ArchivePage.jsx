@@ -6,6 +6,7 @@ import { checkAdmin } from '../api/admin'
 import client from '../api/client'
 import useAuthStore from '../store/authStore'
 import PopupModal from '../components/PopupModal'
+import AddLinkModal from '../components/AddLinkModal'
 
 const TYPE_ICON = {
   LINK: '🔗',
@@ -255,6 +256,7 @@ function ArchivePage() {
   const [hasMore, setHasMore] = useState(true)
   const [loading, setLoading] = useState(false)
   const [showModal, setShowModal] = useState(false)
+  const [showAddModal, setShowAddModal] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const logoutStore = useAuthStore(s => s.logout)
 
@@ -306,6 +308,12 @@ function ArchivePage() {
     setTotalCount(c => Math.max(0, c - 1))
   }, [])
 
+  // 웹에서 링크 추가 성공 → 피드 맨 앞에 즉시 반영
+  const handleAdded = useCallback((item) => {
+    setItems(prev => [item, ...prev])
+    setTotalCount(c => c + 1)
+  }, [])
+
   const handleLogout = async () => {
     try { await logout() } catch (_) {}
     logoutStore()
@@ -315,6 +323,7 @@ function ArchivePage() {
   return (
     <div className="min-h-screen bg-[#f2f4f6]">
       {showModal && <LinkCodeModal onClose={() => setShowModal(false)} />}
+      {showAddModal && <AddLinkModal onClose={() => setShowAddModal(false)} onAdded={handleAdded} />}
       <PopupModal />
 
       {/* 헤더 (frosted) */}
@@ -439,6 +448,17 @@ function ArchivePage() {
           )}
         </div>
       </main>
+
+      {/* 링크 추가 FAB (우하단 고정) */}
+      <button
+        onClick={() => setShowAddModal(true)}
+        aria-label="링크 추가"
+        className="fixed bottom-6 right-6 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-[#191f28] text-white shadow-[0_4px_16px_rgba(0,0,0,0.18)] hover:bg-[#333d4b] active:scale-95 transition-all"
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+      </button>
     </div>
   )
 }
