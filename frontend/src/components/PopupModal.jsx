@@ -57,7 +57,7 @@ function PopupModal() {
       onClick={close}
     >
       <div
-        className="bg-white w-full sm:w-[24rem] rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl animate-[slideup_0.25s_ease]"
+        className="bg-white w-full sm:w-[28rem] rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl animate-[slideup_0.25s_ease]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 이미지·본문 어디를 눌러도 linkUrl로 이동 (linkUrl 없으면 클릭 비활성) */}
@@ -75,7 +75,7 @@ function PopupModal() {
         <div className="px-6 pt-5 pb-1">
           <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[#e5e8eb] sm:hidden" />
           <div onClick={goLink} className={hasLink ? 'cursor-pointer' : ''}>
-            <h2 className="text-lg font-bold text-[#191f28] mb-1.5">{popup.title}</h2>
+            <h2 className="text-base font-bold text-[#191f28] mb-1">{popup.title}</h2>
             {popup.content && (
               <p className="text-sm text-[#6b7684] leading-relaxed whitespace-pre-wrap">{popup.content}</p>
             )}
