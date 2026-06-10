@@ -72,7 +72,7 @@ function AnnouncementDetailPage() {
             </button>
           </div>
         ) : (
-          <article className="bg-white rounded-2xl p-7 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_16px_rgba(0,0,0,0.04)]">
+          <article className="bg-white rounded-2xl px-6 pt-6 pb-4 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_16px_rgba(0,0,0,0.04)]">
             <h1 className="text-2xl font-extrabold text-[#191f28] tracking-tight leading-snug">
               {announcement.title}
             </h1>
@@ -82,25 +82,27 @@ function AnnouncementDetailPage() {
             </div>
 
             {isAdmin && (
-              <div className="mt-7 pt-5 border-t border-[#f2f4f6] flex flex-wrap gap-2">
+              <div className="mt-7 pt-5 border-t border-[#f2f4f6] flex items-center justify-between">
                 <button
                   onClick={() => navigate(`/admin?tab=popups&link=/announcements/${id}`)}
-                  className="text-sm font-bold text-white bg-[#191f28] hover:bg-[#333d4b] px-4 py-2.5 rounded-xl transition-colors"
+                  className="text-sm font-medium text-[#8b95a1] hover:text-[#4e5968] py-2 transition-colors"
                 >
                   이 공지로 팝업 만들기
                 </button>
-                <button
-                  onClick={() => navigate(`/admin?tab=announcements&edit=${id}`)}
-                  className="text-sm font-semibold text-[#4e5968] bg-[#f2f4f6] hover:bg-[#e5e8eb] px-4 py-2.5 rounded-xl transition-colors"
-                >
-                  수정
-                </button>
-                <button
-                  onClick={handleDelete}
-                  className="text-sm font-semibold text-[#f04452] bg-[#f04452]/10 hover:bg-[#f04452]/15 px-4 py-2.5 rounded-xl transition-colors"
-                >
-                  삭제
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => navigate(`/admin?tab=announcements&edit=${id}`)}
+                    className="text-sm font-semibold text-[#4e5968] bg-[#f2f4f6] hover:bg-[#e5e8eb] px-4 py-2.5 rounded-xl transition-colors"
+                  >
+                    수정
+                  </button>
+                  <button
+                    onClick={handleDelete}
+                    className="text-sm font-semibold text-[#f04452] bg-[#f04452]/10 hover:bg-[#f04452]/15 px-4 py-2.5 rounded-xl transition-colors"
+                  >
+                    삭제
+                  </button>
+                </div>
               </div>
             )}
           </article>
