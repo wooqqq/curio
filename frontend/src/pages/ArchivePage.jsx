@@ -168,7 +168,7 @@ function ItemCard({ item, onRecrawl, onDelete }) {
   return (
     <div
       onClick={handleClick}
-      className={`group bg-white rounded-2xl flex items-start gap-4 p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_16px_rgba(0,0,0,0.04)] transition-all duration-200 ${
+      className={`group bg-white rounded-2xl flex items-start gap-3 p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_16px_rgba(0,0,0,0.04)] transition-all duration-200 ${
         clickable ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgba(0,0,0,0.06),0_12px_28px_rgba(0,0,0,0.08)]' : ''
       }`}
     >
@@ -179,17 +179,6 @@ function ItemCard({ item, onRecrawl, onDelete }) {
           <span className="truncate">{source}</span>
           <span className="text-[#d1d6db]">·</span>
           <span className="shrink-0">{timeAgo(item.createdAt)}</span>
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            aria-label="삭제"
-            className="ml-auto shrink-0 -my-1 flex h-7 w-7 items-center justify-center rounded-full text-[#b0b8c1] hover:text-[#f04452] hover:bg-[#f04452]/10 disabled:opacity-40 transition-colors"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6" />
-              <path d="M10 11v6M14 11v6" />
-            </svg>
-          </button>
         </div>
 
         <p className="text-[15px] font-bold text-[#191f28] leading-snug line-clamp-2 mb-1">
@@ -239,6 +228,19 @@ function ItemCard({ item, onRecrawl, onDelete }) {
           onError={e => { e.currentTarget.style.display = 'none' }}
         />
       )}
+
+      {/* 삭제 — 썸네일 유무와 무관하게 카드 우상단 고정 */}
+      <button
+        onClick={handleDelete}
+        disabled={deleting}
+        aria-label="삭제"
+        className="shrink-0 -mr-1 flex h-7 w-7 items-center justify-center rounded-full text-[#b0b8c1] hover:text-[#f04452] hover:bg-[#f04452]/10 disabled:opacity-40 transition-colors"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6" />
+          <path d="M10 11v6M14 11v6" />
+        </svg>
+      </button>
     </div>
   )
 }
