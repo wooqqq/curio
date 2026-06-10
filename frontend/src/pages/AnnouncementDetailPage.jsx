@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getAnnouncement } from '../api/notice'
+import { checkAdmin } from '../api/admin'
 
 function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('ko-KR', {
@@ -14,6 +15,7 @@ function AnnouncementDetailPage() {
   const [announcement, setAnnouncement] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
     setLoading(true)
@@ -22,6 +24,11 @@ function AnnouncementDetailPage() {
       .catch(() => setError(true))
       .finally(() => setLoading(false))
   }, [id])
+
+  // 관리자에게만 수정/삭제·팝업 만들기 노출 (백엔드도 독립 검증)
+  useEffect(() => {
+    checkAdmin().then((r) => setIsAdmin(r.data.admin)).catch(() => {})
+  }, [])
 
   return (
     <div className="min-h-screen bg-[#f2f4f6]">
@@ -63,6 +70,17 @@ function AnnouncementDetailPage() {
             <div className="mt-6 text-[15px] text-[#333d4b] leading-relaxed whitespace-pre-wrap">
               {announcement.content}
             </div>
+
+            {isAdmin && (
+              <div className="mt-7 pt-5 border-t border-[#f2f4f6] flex flex-wrap gap-2">
+                <button
+                  onClick={() => navigate(`/admin?tab=popups&link=/announcements/${id}`)}
+                  className="text-sm font-bold text-white bg-[#191f28] hover:bg-[#333d4b] px-4 py-2.5 rounded-xl transition-colors"
+                >
+                  이 공지로 팝업 만들기
+                </button>
+              </div>
+            )}
           </article>
         )}
       </main>

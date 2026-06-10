@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getAnnouncements } from '../api/notice'
 import {
   checkAdmin,
@@ -105,13 +105,13 @@ function AnnouncementsTab() {
 }
 
 // ---------- 팝업 관리 ----------
-function PopupsTab() {
+function PopupsTab({ initialLinkUrl = '' }) {
   const [list, setList] = useState([])
   const [editingId, setEditingId] = useState(null)
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [imageUrl, setImageUrl] = useState('')
-  const [linkUrl, setLinkUrl] = useState('')
+  const [linkUrl, setLinkUrl] = useState(initialLinkUrl)
   const [active, setActive] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -273,7 +273,10 @@ function PopupsTab() {
 
 function AdminPage() {
   const navigate = useNavigate()
-  const [tab, setTab] = useState('announcements')
+  const [searchParams] = useSearchParams()
+  // 공지 상세에서 ?tab=popups&link=/announcements/3 로 넘어오면 팝업 탭 + linkUrl 프리필
+  const [tab, setTab] = useState(searchParams.get('tab') === 'popups' ? 'popups' : 'announcements')
+  const prefillLink = searchParams.get('link') || ''
   const [allowed, setAllowed] = useState(null) // null=확인중, false=권한없음, true=관리자
 
   useEffect(() => {
@@ -328,7 +331,7 @@ function AdminPage() {
           ))}
         </div>
 
-        {tab === 'announcements' ? <AnnouncementsTab /> : <PopupsTab />}
+        {tab === 'announcements' ? <AnnouncementsTab /> : <PopupsTab initialLinkUrl={prefillLink} />}
       </main>
     </div>
   )
