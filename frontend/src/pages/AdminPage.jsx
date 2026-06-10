@@ -72,7 +72,7 @@ function AnnouncementsTab({ editId }) {
 
   return (
     <div className="space-y-6">
-      <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 shadow-[0_1px_2px_rgba(0,0,0,0.04)] space-y-4">
+      <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] space-y-4">
         <h2 className="text-base font-bold text-[#191f28]">{editingId ? '공지 수정' : '새 공지 작성'}</h2>
         <div>
           <label className={labelCls}>제목</label>
@@ -95,7 +95,7 @@ function AnnouncementsTab({ editId }) {
           <p className="text-center text-sm text-[#8b95a1] py-10">등록된 공지가 없어요.</p>
         ) : (
           list.map((a) => (
-            <div key={a.id} className="bg-white rounded-2xl px-5 py-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)] flex items-start gap-3">
+            <div key={a.id} className="bg-white rounded-2xl px-4 py-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] flex items-start gap-3">
               <div className="flex-1 min-w-0">
                 <p className="text-[15px] font-bold text-[#191f28] truncate">{a.title}</p>
                 <p className="text-xs text-[#8b95a1] mt-0.5">#{a.id} · {fmtDate(a.createdAt)}</p>
@@ -188,7 +188,7 @@ function PopupsTab({ initialLinkUrl = '' }) {
 
   return (
     <div className="space-y-6">
-      <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 shadow-[0_1px_2px_rgba(0,0,0,0.04)] space-y-4">
+      <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] space-y-4">
         <h2 className="text-base font-bold text-[#191f28]">{editingId ? '팝업 수정' : '새 팝업 만들기'}</h2>
 
         <div>
@@ -258,7 +258,7 @@ function PopupsTab({ initialLinkUrl = '' }) {
           <p className="text-center text-sm text-[#8b95a1] py-10">등록된 팝업이 없어요.</p>
         ) : (
           list.map((p) => (
-            <div key={p.id} className="bg-white rounded-2xl px-5 py-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)] flex items-center gap-3">
+            <div key={p.id} className="bg-white rounded-2xl px-4 py-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] flex items-center gap-3">
               {p.imageUrl && <img src={p.imageUrl} alt="" className="h-12 w-12 rounded-lg object-cover bg-[#f2f4f6] shrink-0" />}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">

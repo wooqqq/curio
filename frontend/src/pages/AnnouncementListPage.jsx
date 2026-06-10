@@ -49,7 +49,7 @@ function AnnouncementListPage() {
               <Link
                 key={a.id}
                 to={`/announcements/${a.id}`}
-                className="block bg-white rounded-2xl px-5 py-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgba(0,0,0,0.06),0_12px_28px_rgba(0,0,0,0.08)] transition-all duration-200"
+                className="block bg-white rounded-2xl px-4 py-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgba(0,0,0,0.06),0_12px_28px_rgba(0,0,0,0.08)] transition-all duration-200"
               >
                 <p className="text-[15px] font-bold text-[#191f28] truncate">{a.title}</p>
                 <p className="text-xs text-[#8b95a1] mt-1">{formatDate(a.createdAt)}</p>
