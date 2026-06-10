@@ -116,11 +116,13 @@ function PopupsTab() {
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
+  const [announcements, setAnnouncements] = useState([]) // linkUrl을 공지에서 채우기 위한 목록
 
   const load = useCallback(() => {
     getAdminPopups().then((r) => setList(r.data)).catch(() => {})
   }, [])
   useEffect(() => { load() }, [load])
+  useEffect(() => { getAnnouncements().then((r) => setAnnouncements(r.data)).catch(() => {}) }, [])
 
   const reset = () => {
     setEditingId(null); setTitle(''); setContent(''); setImageUrl(''); setLinkUrl(''); setActive(true); setUploadError('')
@@ -214,8 +216,20 @@ function PopupsTab() {
 
         <div>
           <label className={labelCls}>링크 URL <span className="font-normal text-[#b0b8c1]">(선택)</span></label>
+          {announcements.length > 0 && (
+            <select
+              className={`${inputCls} mb-2`}
+              value=""
+              onChange={(e) => { if (e.target.value) setLinkUrl(`/announcements/${e.target.value}`) }}
+            >
+              <option value="">공지에서 가져오기…</option>
+              {announcements.map((a) => (
+                <option key={a.id} value={a.id}>#{a.id} · {a.title}</option>
+              ))}
+            </select>
+          )}
           <input className={inputCls} value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="/announcements/3 또는 https://..." />
-          <p className="text-xs text-[#8b95a1] mt-1.5">공지로 연결하려면 <code className="text-[#4e5968]">/announcements/공지번호</code>, 외부는 <code className="text-[#4e5968]">https://</code></p>
+          <p className="text-xs text-[#8b95a1] mt-1.5">위에서 공지를 고르면 자동 입력돼요. 외부 링크는 <code className="text-[#4e5968]">https://</code> 직접 입력</p>
         </div>
 
         <label className="flex items-center gap-2.5 cursor-pointer select-none">
