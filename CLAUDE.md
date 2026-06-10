@@ -56,18 +56,20 @@ curio/                          ← 모노레포 루트
         │   └── item/           ← OgData, ClassificationResult
         ├── entity/
         │   ├── enums/          ← ItemType, Category, ItemStatus
-        │   └── (User, Item, Tag, RefreshToken)
+        │   └── (User, Item, Tag, RefreshToken, Announcement, Popup)
         ├── repository/
         ├── service/
         │   ├── queue/          ← QueueService (인터페이스 + 구현체)
         │   ├── OgCrawlerService
         │   ├── OpenAiService
-        │   ├── S3Service
-        │   └── LinkCodeService
+        │   ├── S3Service       ← uploadFromUrl(크롤 이미지) + uploadImage(관리자 업로드, magic byte 검증)
+        │   ├── LinkCodeService
+        │   ├── AnnouncementService
+        │   └── PopupService    ← 활성 팝업 1개 보장
         ├── processor/          ← ItemProcessor (크롤링, AI, 저장)
-        ├── controller/
+        ├── controller/         ← Item, Announcement, Popup(공개) + Admin(관리자 전용)
         ├── exception/          ← GlobalExceptionHandler, ErrorCode
-        └── security/           ← JwtFilter, JwtUtil, CookieUtil
+        └── security/           ← JwtFilter, JwtUtil, CookieUtil, AdminGuard(ADMIN_KAKAO_IDS allowlist)
 ```
 
 ---
@@ -94,6 +96,8 @@ curio/                          ← 모노레포 루트
 - `items` — 저장 아이템 (LINK/IMAGE/TEXT, 카테고리: DEVELOPMENT/CAREER/JOB/ETC)
 - `tags` + `item_tags` — 다대다
 - `refresh_tokens` — JWT refresh rotation
+- `announcements` — 관리자 공지 게시물
+- `popups` — 진입 팝업 배너 (활성 1개, linkUrl로 공지/외부 연결)
 
 ---
 
@@ -124,6 +128,12 @@ curio/                          ← 모노레포 루트
 | Phase 4 | 웹 아카이브 UI | ✅ 완료 |
 | Phase 5 | 검색 | ✅ 완료 |
 | Phase 6 | 배포 | ✅ 완료 (Railway + Vercel, 로그인·저장 E2E 검증) |
+
+### 배포 후 추가 기능
+- 공지/팝업 관리자 페이지 (`/admin`) — 공지 CRUD, 팝업(이미지 업로드·linkUrl·활성) CRUD ✅ 로컬 E2E 검증, 배포 대기
+- 사용자 공지 열람 — `/announcements` 목록 + 상세, 아카이브 진입 팝업 모달
+- 관리자 권한: `ADMIN_KAKAO_IDS` allowlist (설계결정 #15) / 팝업 모델: 설계결정 #16
+- S3 실구축 완료 (버킷 `curio-prod-assets`, 서울) — 그 전까지 dormant였음
 
 ---
 
