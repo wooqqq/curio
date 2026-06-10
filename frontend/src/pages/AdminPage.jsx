@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { getAnnouncements } from '../api/notice'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { getAnnouncements, getAnnouncement } from '../api/notice'
 import {
   checkAdmin,
   createAnnouncement, updateAnnouncement, deleteAnnouncement,
@@ -20,7 +20,7 @@ function fmtDate(d) {
 }
 
 // ---------- 공지 관리 ----------
-function AnnouncementsTab() {
+function AnnouncementsTab({ editId }) {
   const [list, setList] = useState([])
   const [editingId, setEditingId] = useState(null)
   const [title, setTitle] = useState('')
@@ -31,6 +31,14 @@ function AnnouncementsTab() {
     getAnnouncements().then((r) => setList(r.data)).catch(() => {})
   }, [])
   useEffect(() => { load() }, [load])
+
+  // 공지 상세의 '수정'(?edit={id})으로 진입하면 해당 공지를 폼에 프리필
+  useEffect(() => {
+    if (!editId) return
+    getAnnouncement(editId)
+      .then((r) => { setEditingId(r.data.id); setTitle(r.data.title); setContent(r.data.content) })
+      .catch(() => {})
+  }, [editId])
 
   const reset = () => { setEditingId(null); setTitle(''); setContent('') }
 
@@ -64,7 +72,7 @@ function AnnouncementsTab() {
 
   return (
     <div className="space-y-6">
-      <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 shadow-[0_1px_2px_rgba(0,0,0,0.04)] space-y-4">
+      <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] space-y-4">
         <h2 className="text-base font-bold text-[#191f28]">{editingId ? '공지 수정' : '새 공지 작성'}</h2>
         <div>
           <label className={labelCls}>제목</label>
@@ -87,7 +95,7 @@ function AnnouncementsTab() {
           <p className="text-center text-sm text-[#8b95a1] py-10">등록된 공지가 없어요.</p>
         ) : (
           list.map((a) => (
-            <div key={a.id} className="bg-white rounded-2xl px-5 py-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)] flex items-start gap-3">
+            <div key={a.id} className="bg-white rounded-2xl px-4 py-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] flex items-start gap-3">
               <div className="flex-1 min-w-0">
                 <p className="text-[15px] font-bold text-[#191f28] truncate">{a.title}</p>
                 <p className="text-xs text-[#8b95a1] mt-0.5">#{a.id} · {fmtDate(a.createdAt)}</p>
@@ -105,22 +113,24 @@ function AnnouncementsTab() {
 }
 
 // ---------- 팝업 관리 ----------
-function PopupsTab() {
+function PopupsTab({ initialLinkUrl = '' }) {
   const [list, setList] = useState([])
   const [editingId, setEditingId] = useState(null)
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [imageUrl, setImageUrl] = useState('')
-  const [linkUrl, setLinkUrl] = useState('')
+  const [linkUrl, setLinkUrl] = useState(initialLinkUrl)
   const [active, setActive] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState('')
+  const [announcements, setAnnouncements] = useState([]) // linkUrl을 공지에서 채우기 위한 목록
 
   const load = useCallback(() => {
     getAdminPopups().then((r) => setList(r.data)).catch(() => {})
   }, [])
   useEffect(() => { load() }, [load])
+  useEffect(() => { getAnnouncements().then((r) => setAnnouncements(r.data)).catch(() => {}) }, [])
 
   const reset = () => {
     setEditingId(null); setTitle(''); setContent(''); setImageUrl(''); setLinkUrl(''); setActive(true); setUploadError('')
@@ -178,7 +188,7 @@ function PopupsTab() {
 
   return (
     <div className="space-y-6">
-      <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 shadow-[0_1px_2px_rgba(0,0,0,0.04)] space-y-4">
+      <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] space-y-4">
         <h2 className="text-base font-bold text-[#191f28]">{editingId ? '팝업 수정' : '새 팝업 만들기'}</h2>
 
         <div>
@@ -214,8 +224,20 @@ function PopupsTab() {
 
         <div>
           <label className={labelCls}>링크 URL <span className="font-normal text-[#b0b8c1]">(선택)</span></label>
+          {announcements.length > 0 && (
+            <select
+              className={`${inputCls} mb-2`}
+              value=""
+              onChange={(e) => { if (e.target.value) setLinkUrl(`/announcements/${e.target.value}`) }}
+            >
+              <option value="">공지에서 가져오기…</option>
+              {announcements.map((a) => (
+                <option key={a.id} value={a.id}>#{a.id} · {a.title}</option>
+              ))}
+            </select>
+          )}
           <input className={inputCls} value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="/announcements/3 또는 https://..." />
-          <p className="text-xs text-[#8b95a1] mt-1.5">공지로 연결하려면 <code className="text-[#4e5968]">/announcements/공지번호</code>, 외부는 <code className="text-[#4e5968]">https://</code></p>
+          <p className="text-xs text-[#8b95a1] mt-1.5">위에서 공지를 고르면 자동 입력돼요. 외부 링크는 <code className="text-[#4e5968]">https://</code> 직접 입력</p>
         </div>
 
         <label className="flex items-center gap-2.5 cursor-pointer select-none">
@@ -236,7 +258,7 @@ function PopupsTab() {
           <p className="text-center text-sm text-[#8b95a1] py-10">등록된 팝업이 없어요.</p>
         ) : (
           list.map((p) => (
-            <div key={p.id} className="bg-white rounded-2xl px-5 py-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)] flex items-center gap-3">
+            <div key={p.id} className="bg-white rounded-2xl px-4 py-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] flex items-center gap-3">
               {p.imageUrl && <img src={p.imageUrl} alt="" className="h-12 w-12 rounded-lg object-cover bg-[#f2f4f6] shrink-0" />}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
@@ -259,7 +281,10 @@ function PopupsTab() {
 
 function AdminPage() {
   const navigate = useNavigate()
-  const [tab, setTab] = useState('announcements')
+  const [searchParams] = useSearchParams()
+  // 공지 상세에서 ?tab=popups&link=/announcements/3 로 넘어오면 팝업 탭 + linkUrl 프리필
+  const [tab, setTab] = useState(searchParams.get('tab') === 'popups' ? 'popups' : 'announcements')
+  const prefillLink = searchParams.get('link') || ''
   const [allowed, setAllowed] = useState(null) // null=확인중, false=권한없음, true=관리자
 
   useEffect(() => {
@@ -314,7 +339,7 @@ function AdminPage() {
           ))}
         </div>
 
-        {tab === 'announcements' ? <AnnouncementsTab /> : <PopupsTab />}
+        {tab === 'announcements' ? <AnnouncementsTab editId={searchParams.get('edit')} /> : <PopupsTab initialLinkUrl={prefillLink} />}
       </main>
     </div>
   )

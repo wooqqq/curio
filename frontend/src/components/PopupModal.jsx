@@ -57,55 +57,44 @@ function PopupModal() {
       onClick={close}
     >
       <div
-        className="bg-white w-full sm:w-[24rem] rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl animate-[slideup_0.25s_ease]"
+        className="bg-white w-full sm:w-[28rem] rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl animate-[slideup_0.25s_ease]"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* 이미지·본문 어디를 눌러도 linkUrl로 이동 (linkUrl 없으면 클릭 비활성) */}
         {popup.imageUrl && (
-          <button
-            type="button"
-            onClick={goLink}
-            className={`block w-full ${hasLink ? 'cursor-pointer' : 'cursor-default'}`}
-            aria-label={popup.title}
-          >
+          <div onClick={goLink} className={hasLink ? 'cursor-pointer' : ''}>
             <img
               src={popup.imageUrl}
               alt={popup.title}
               className="w-full max-h-[60vh] object-cover bg-[#f2f4f6]"
               onError={(e) => { e.currentTarget.style.display = 'none' }}
             />
-          </button>
+          </div>
         )}
 
-        <div className="p-6">
+        <div className="px-6 pt-5 pb-1">
           <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-[#e5e8eb] sm:hidden" />
-          <h2 className="text-lg font-bold text-[#191f28] mb-1.5">{popup.title}</h2>
-          {popup.content && (
-            <p className="text-sm text-[#6b7684] leading-relaxed whitespace-pre-wrap">{popup.content}</p>
-          )}
-
-          {hasLink && (
-            <button
-              onClick={goLink}
-              className="mt-5 w-full bg-[#191f28] hover:bg-[#333d4b] text-white text-sm font-bold py-3.5 rounded-2xl transition-colors"
-            >
-              자세히 보기
-            </button>
-          )}
-
-          <div className="mt-2.5 flex items-center justify-between">
-            <button
-              onClick={dismissToday}
-              className="text-sm font-medium text-[#8b95a1] hover:text-[#4e5968] py-2 transition-colors"
-            >
-              오늘 하루 보지 않기
-            </button>
-            <button
-              onClick={close}
-              className="text-sm font-semibold text-[#4e5968] hover:text-[#191f28] py-2 transition-colors"
-            >
-              닫기
-            </button>
+          <div onClick={goLink} className={hasLink ? 'cursor-pointer' : ''}>
+            <h2 className="text-base font-bold text-[#191f28] mb-1">{popup.title}</h2>
+            {popup.content && (
+              <p className="text-sm text-[#6b7684] leading-relaxed whitespace-pre-wrap">{popup.content}</p>
+            )}
           </div>
+        </div>
+
+        <div className="flex items-center justify-between border-t border-[#f2f4f6] px-5 py-1.5">
+          <button
+            onClick={dismissToday}
+            className="text-sm font-medium text-[#8b95a1] hover:text-[#4e5968] py-2 transition-colors"
+          >
+            오늘 하루 보지 않기
+          </button>
+          <button
+            onClick={close}
+            className="text-sm font-semibold text-[#4e5968] hover:text-[#191f28] py-2 transition-colors"
+          >
+            닫기
+          </button>
         </div>
       </div>
     </div>

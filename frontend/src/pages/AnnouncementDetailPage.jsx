@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getAnnouncement } from '../api/notice'
+import { checkAdmin, deleteAnnouncement } from '../api/admin'
 
 function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('ko-KR', {
@@ -14,6 +15,7 @@ function AnnouncementDetailPage() {
   const [announcement, setAnnouncement] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
     setLoading(true)
@@ -22,6 +24,21 @@ function AnnouncementDetailPage() {
       .catch(() => setError(true))
       .finally(() => setLoading(false))
   }, [id])
+
+  // 관리자에게만 수정/삭제·팝업 만들기 노출 (백엔드도 독립 검증)
+  useEffect(() => {
+    checkAdmin().then((r) => setIsAdmin(r.data.admin)).catch(() => {})
+  }, [])
+
+  const handleDelete = async () => {
+    if (!window.confirm('이 공지를 삭제할까요?')) return
+    try {
+      await deleteAnnouncement(id)
+      navigate('/announcements')
+    } catch (err) {
+      alert(err?.message || '삭제하지 못했어요.')
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[#f2f4f6]">
@@ -55,7 +72,7 @@ function AnnouncementDetailPage() {
             </button>
           </div>
         ) : (
-          <article className="bg-white rounded-2xl p-7 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_16px_rgba(0,0,0,0.04)]">
+          <article className="bg-white rounded-2xl px-6 pt-6 pb-4 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_16px_rgba(0,0,0,0.04)]">
             <h1 className="text-2xl font-extrabold text-[#191f28] tracking-tight leading-snug">
               {announcement.title}
             </h1>
@@ -63,6 +80,31 @@ function AnnouncementDetailPage() {
             <div className="mt-6 text-[15px] text-[#333d4b] leading-relaxed whitespace-pre-wrap">
               {announcement.content}
             </div>
+
+            {isAdmin && (
+              <div className="mt-7 pt-5 border-t border-[#f2f4f6] flex items-center justify-between">
+                <button
+                  onClick={() => navigate(`/admin?tab=popups&link=/announcements/${id}`)}
+                  className="text-sm font-medium text-[#8b95a1] hover:text-[#4e5968] py-2 transition-colors"
+                >
+                  이 공지로 팝업 만들기
+                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => navigate(`/admin?tab=announcements&edit=${id}`)}
+                    className="text-sm font-semibold text-[#4e5968] bg-[#f2f4f6] hover:bg-[#e5e8eb] px-4 py-2.5 rounded-xl transition-colors"
+                  >
+                    수정
+                  </button>
+                  <button
+                    onClick={handleDelete}
+                    className="text-sm font-semibold text-[#f04452] bg-[#f04452]/10 hover:bg-[#f04452]/15 px-4 py-2.5 rounded-xl transition-colors"
+                  >
+                    삭제
+                  </button>
+                </div>
+              </div>
+            )}
           </article>
         )}
       </main>
