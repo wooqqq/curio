@@ -129,9 +129,10 @@ curio/                          ← 모노레포 루트
 | Phase 5 | 검색 | ✅ 완료 |
 | Phase 6 | 배포 | ✅ 완료 (Railway + Vercel, 로그인·저장 E2E 검증) |
 
-### 배포 후 추가 기능
-- 공지/팝업 관리자 페이지 (`/admin`) — 공지 CRUD, 팝업(이미지 업로드·linkUrl·활성) CRUD ✅ 로컬 E2E 검증, 배포 대기
-- 사용자 공지 열람 — `/announcements` 목록 + 상세, 아카이브 진입 팝업 모달
+### 배포 후 추가 기능 (✅ 배포 완료)
+- 공지/팝업 관리자 페이지 (`/admin`) — 공지 CRUD, 팝업(이미지 업로드·linkUrl·활성) CRUD
+- 사용자 공지 열람 — `/announcements` 목록 + 상세, 아카이브 진입 팝업 모달(이미지/본문 클릭→linkUrl, 오늘 하루 보지 않기)
+- 관리자 동선: 팝업 폼에서 "공지에서 가져오기"로 linkUrl 자동입력 / 공지 상세에 관리자용 "팝업 만들기"(linkUrl 프리필)·수정·삭제 (쿼리파라미터 `?tab=&link=&edit=`)
 - 관리자 권한: `ADMIN_KAKAO_IDS` allowlist (설계결정 #15) / 팝업 모델: 설계결정 #16
 - S3 실구축 완료 (버킷 `curio-prod-assets`, 서울) — 그 전까지 dormant였음
 
