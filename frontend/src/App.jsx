@@ -4,6 +4,7 @@ import LoginPage from './pages/LoginPage'
 import AuthCallbackPage from './pages/AuthCallbackPage'
 import ArchivePage from './pages/ArchivePage'
 import AdminPage from './pages/AdminPage'
+import AnnouncementListPage from './pages/AnnouncementListPage'
 import AnnouncementDetailPage from './pages/AnnouncementDetailPage'
 import client from './api/client'
 import useAuthStore from './store/authStore'
@@ -55,6 +56,14 @@ function App() {
           element={
             <PrivateRoute>
               <ArchivePage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/announcements"
+          element={
+            <PrivateRoute>
+              <AnnouncementListPage />
             </PrivateRoute>
           }
         />
