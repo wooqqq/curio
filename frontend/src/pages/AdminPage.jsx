@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { getAnnouncements } from '../api/notice'
+import { getAnnouncements, getAnnouncement } from '../api/notice'
 import {
   checkAdmin,
   createAnnouncement, updateAnnouncement, deleteAnnouncement,
@@ -20,7 +20,7 @@ function fmtDate(d) {
 }
 
 // ---------- 공지 관리 ----------
-function AnnouncementsTab() {
+function AnnouncementsTab({ editId }) {
   const [list, setList] = useState([])
   const [editingId, setEditingId] = useState(null)
   const [title, setTitle] = useState('')
@@ -31,6 +31,14 @@ function AnnouncementsTab() {
     getAnnouncements().then((r) => setList(r.data)).catch(() => {})
   }, [])
   useEffect(() => { load() }, [load])
+
+  // 공지 상세의 '수정'(?edit={id})으로 진입하면 해당 공지를 폼에 프리필
+  useEffect(() => {
+    if (!editId) return
+    getAnnouncement(editId)
+      .then((r) => { setEditingId(r.data.id); setTitle(r.data.title); setContent(r.data.content) })
+      .catch(() => {})
+  }, [editId])
 
   const reset = () => { setEditingId(null); setTitle(''); setContent('') }
 
@@ -331,7 +339,7 @@ function AdminPage() {
           ))}
         </div>
 
-        {tab === 'announcements' ? <AnnouncementsTab /> : <PopupsTab initialLinkUrl={prefillLink} />}
+        {tab === 'announcements' ? <AnnouncementsTab editId={searchParams.get('edit')} /> : <PopupsTab initialLinkUrl={prefillLink} />}
       </main>
     </div>
   )

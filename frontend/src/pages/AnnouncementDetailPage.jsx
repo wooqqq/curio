@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getAnnouncement } from '../api/notice'
-import { checkAdmin } from '../api/admin'
+import { checkAdmin, deleteAnnouncement } from '../api/admin'
 
 function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('ko-KR', {
@@ -29,6 +29,16 @@ function AnnouncementDetailPage() {
   useEffect(() => {
     checkAdmin().then((r) => setIsAdmin(r.data.admin)).catch(() => {})
   }, [])
+
+  const handleDelete = async () => {
+    if (!window.confirm('이 공지를 삭제할까요?')) return
+    try {
+      await deleteAnnouncement(id)
+      navigate('/announcements')
+    } catch (err) {
+      alert(err?.message || '삭제하지 못했어요.')
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[#f2f4f6]">
@@ -78,6 +88,18 @@ function AnnouncementDetailPage() {
                   className="text-sm font-bold text-white bg-[#191f28] hover:bg-[#333d4b] px-4 py-2.5 rounded-xl transition-colors"
                 >
                   이 공지로 팝업 만들기
+                </button>
+                <button
+                  onClick={() => navigate(`/admin?tab=announcements&edit=${id}`)}
+                  className="text-sm font-semibold text-[#4e5968] bg-[#f2f4f6] hover:bg-[#e5e8eb] px-4 py-2.5 rounded-xl transition-colors"
+                >
+                  수정
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="text-sm font-semibold text-[#f04452] bg-[#f04452]/10 hover:bg-[#f04452]/15 px-4 py-2.5 rounded-xl transition-colors"
+                >
+                  삭제
                 </button>
               </div>
             )}
