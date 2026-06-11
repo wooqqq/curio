@@ -1,5 +1,6 @@
 package com.curio.processor;
 
+import com.curio.dto.item.ItemResponse;
 import com.curio.dto.item.OgData;
 import com.curio.entity.Item;
 import com.curio.entity.User;
@@ -58,7 +59,10 @@ public class ItemProcessor {
             log.info("Duplicate URL skipped: userId={} url={}", user.getId(), normalized);
             return;
         }
+        saveLink(user, url, normalized);
+    }
 
+    private Item saveLink(User user, String url, String normalized) {
         OgData og = ogCrawlerService.crawl(url);
 
         Item item = Item.builder()
@@ -74,6 +78,28 @@ public class ItemProcessor {
         itemClassifier.classify(item);
         itemRepository.save(item);
         log.info("LINK saved: userId={} title={} category={}", user.getId(), og.title(), item.getCategory());
+        return item;
+    }
+
+    /**
+     * 웹앱에서 링크를 직접 추가한다. 봇 경로(process)와 달리 동기 처리하고 결과를 반환해
+     * 화면에 즉시 카드를 띄울 수 있게 한다. 중복이면 DUPLICATE_URL로 알린다(봇은 조용히 skip).
+     */
+    @Transactional
+    public ItemResponse addLink(Long userId, String input) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CurioException(ErrorCode.USER_NOT_FOUND));
+
+        if (input == null || !URL_PATTERN.matcher(input).find()) {
+            throw new CurioException(ErrorCode.INVALID_INPUT, "올바른 링크(http/https)를 입력해주세요.");
+        }
+        String url = extractUrl(input.trim());
+        String normalized = normalizeUrl(url);
+
+        if (itemRepository.existsByUserAndNormalizedUrl(user, normalized)) {
+            throw new CurioException(ErrorCode.DUPLICATE_URL);
+        }
+        return ItemResponse.from(saveLink(user, url, normalized));
     }
 
     private void processImage(User user, String imageUrl) {

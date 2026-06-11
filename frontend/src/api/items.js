@@ -7,6 +7,8 @@ export const getItems = (category, page = 0, size = 20, q = '') => {
   return client.get('/items', { params })
 }
 
+export const addItem = (url) => client.post('/items', { url })
+
 export const recrawlItem = (id) => client.post(`/items/${id}/recrawl`)
 
 export const deleteItem = (id) => client.delete(`/items/${id}`)

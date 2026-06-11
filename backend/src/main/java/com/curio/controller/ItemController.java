@@ -1,9 +1,11 @@
 package com.curio.controller;
 
 import com.curio.dto.ApiResponse;
+import com.curio.dto.item.AddItemRequest;
 import com.curio.dto.item.ItemResponse;
 import com.curio.entity.enums.Category;
 import com.curio.service.ItemService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -27,6 +29,15 @@ public class ItemController {
             @RequestParam(defaultValue = "20") int size
     ) {
         return ApiResponse.success(itemService.getItems(userId, category, q, page, size));
+    }
+
+    /** 웹앱에서 링크 직접 추가 (봇 없이 저장). 성공 시 저장된 아이템, 중복이면 DUPLICATE_URL. */
+    @PostMapping
+    public ApiResponse<ItemResponse> add(
+            @AuthenticationPrincipal Long userId,
+            @Valid @RequestBody AddItemRequest request
+    ) {
+        return ApiResponse.success(itemService.addLink(userId, request.url()));
     }
 
     @PostMapping("/{id}/recrawl")
