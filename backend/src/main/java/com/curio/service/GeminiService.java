@@ -18,20 +18,26 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Google Gemini(Google AI Studio)로 아이템을 분류한다(category + tags).
+ * OpenAI에서 전환 — 무료티어로 비용 0(설계결정 #19). 인터페이스/파이프라인은 그대로,
+ * HTTP 호출만 Gemini generateContent로 바꿨다. 키 없으면 호출자가 분류를 미룬다.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class OpenAiService {
+public class GeminiService {
 
-    private static final String OPENAI_URL = "https://api.openai.com/v1/chat/completions";
+    private static final String BASE_URL =
+            "https://generativelanguage.googleapis.com/v1beta/models/";
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
-    @Value("${openai.api-key:}")
+    @Value("${gemini.api-key:}")
     private String apiKey;
 
-    @Value("${openai.model:gpt-4.1-mini}")
+    @Value("${gemini.model:gemini-2.5-flash}")
     private String model;
 
     private static final String SYSTEM_PROMPT = """
@@ -41,8 +47,7 @@ public class OpenAiService {
 
             Categories (pick exactly one):
             - DEVELOPMENT: programming, tech, tools, frameworks, CS concepts
-            - CAREER: career tips, portfolio, interview, networking, soft skills
-            - JOB: job postings, company info, recruitment, salary
+            - CAREER: anything about job-seeking and career — job postings, recruitment, salary, company info, resume(자소서), cover letter, interview, portfolio, networking, career tips, soft skills
             - ETC: anything else
 
             Tags: 1-5 short Korean or English keywords relevant to the content.
@@ -54,45 +59,54 @@ public class OpenAiService {
         return StringUtils.hasText(apiKey);
     }
 
+    /**
+     * 분류 결과를 반환한다. <b>호출 실패 시 null</b>을 반환해, 호출자가 카테고리를
+     * 굳히지 않고 미분류(null)로 남기게 한다 — 일시적 실패(429 등)가 ETC로 잘못 박혀
+     * 영구 오염되는 걸 막는다. ETC는 "진짜 기타"일 때만 나온다.
+     */
     public ClassificationResult classify(String title, String content) {
         if (!StringUtils.hasText(apiKey)) {
-            log.debug("OpenAI API key not configured, using default classification");
-            return new ClassificationResult(Category.ETC, List.of());
+            log.debug("Gemini API key not configured, skipping classification");
+            return null;
         }
 
         String userInput = buildInput(title, content);
         try {
-            String responseJson = callOpenAi(userInput);
-            return parseResult(responseJson);
+            String responseText = callGemini(userInput);
+            return parseResult(responseText);
         } catch (Exception e) {
-            log.error("OpenAI classification failed: {}", e.getMessage());
-            return new ClassificationResult(Category.ETC, List.of());
+            log.error("Gemini classification failed: {}", e.getMessage());
+            return null;
         }
     }
 
-    private String callOpenAi(String userInput) {
+    private String callGemini(String userInput) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(apiKey);
+        // 키를 URL 쿼리(?key=) 대신 헤더로 — 로그·히스토리 노출 방지
+        headers.set("x-goog-api-key", apiKey);
 
         Map<String, Object> body = Map.of(
-                "model", model,
-                "response_format", Map.of("type", "json_object"),
-                "messages", List.of(
-                        Map.of("role", "system", "content", SYSTEM_PROMPT),
-                        Map.of("role", "user", "content", userInput)
-                )
+                "system_instruction", Map.of("parts", List.of(Map.of("text", SYSTEM_PROMPT))),
+                "contents", List.of(Map.of("parts", List.of(Map.of("text", userInput)))),
+                // 응답을 순수 JSON으로 강제 (OpenAI의 response_format json_object 대응)
+                "generationConfig", Map.of("responseMimeType", "application/json")
         );
 
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
-        Map<?, ?> response = restTemplate.postForObject(OPENAI_URL, request, Map.class);
+        String url = BASE_URL + model + ":generateContent";
+        Map<?, ?> response = restTemplate.postForObject(url, request, Map.class);
 
-        if (response == null) throw new RuntimeException("empty response from OpenAI");
+        if (response == null) throw new RuntimeException("empty response from Gemini");
 
-        List<?> choices = (List<?>) response.get("choices");
-        Map<?, ?> first = (Map<?, ?>) choices.get(0);
-        Map<?, ?> message = (Map<?, ?>) first.get("message");
-        return (String) message.get("content");
+        List<?> candidates = (List<?>) response.get("candidates");
+        if (candidates == null || candidates.isEmpty()) {
+            throw new RuntimeException("no candidates in Gemini response (blocked/empty)");
+        }
+        Map<?, ?> first = (Map<?, ?>) candidates.get(0);
+        Map<?, ?> contentNode = (Map<?, ?>) first.get("content");
+        List<?> parts = (List<?>) contentNode.get("parts");
+        return (String) ((Map<?, ?>) parts.get(0)).get("text");
     }
 
     private ClassificationResult parseResult(String json) throws Exception {

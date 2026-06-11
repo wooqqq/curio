@@ -22,7 +22,7 @@ public class ItemClassifier {
     /** 이 길이 미만의 텍스트는 분류 의미가 적어 AI 호출 없이 ETC 처리. */
     private static final int MIN_TEXT_LENGTH_FOR_AI = 20;
 
-    private final OpenAiService openAiService;
+    private final GeminiService geminiService;
     private final TagRepository tagRepository;
 
     public void classify(Item item) {
@@ -40,11 +40,16 @@ public class ItemClassifier {
 
         // 키가 없으면 분류를 미룬다 — category=null로 남겨, 키를 켠 뒤 reclassify-all이 채우게 한다.
         // (여기서 ETC로 굳히면 키를 켜도 백필이 못 잡아 영영 ETC에 갇힌다.)
-        if (!openAiService.isEnabled()) {
+        if (!geminiService.isEnabled()) {
             return;
         }
 
-        ClassificationResult result = openAiService.classify(item.getTitle(), item.getContent());
+        // 호출 실패(null)면 category를 굳히지 않고 미분류(null)로 둔다 — 백필이 다시 잡게.
+        // (ETC로 박으면 일시적 실패가 영구 오염되고, 백필도 진짜 기타와 구분 못 한다.)
+        ClassificationResult result = geminiService.classify(item.getTitle(), item.getContent());
+        if (result == null) {
+            return;
+        }
         item.updateCategory(result.category());
         for (String name : result.tags()) {
             item.addTag(getOrCreateTag(name));

@@ -101,6 +101,11 @@ public class Item {
         this.tags.add(tag);
     }
 
+    /** 재분류 시 기존 태그를 비운다(join 행만 제거, 공유 Tag는 유지). 중복 누적 방지. */
+    public void clearTags() {
+        this.tags.clear();
+    }
+
     public void updateCategory(Category category) {
         this.category = category;
     }

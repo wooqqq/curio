@@ -81,13 +81,17 @@ public class ItemService {
     }
 
     /**
-     * 아직 분류되지 않은(category=null) 아이템을 AI로 일괄 재분류한다.
-     * AI 분류 기능을 나중에 켰을 때, 그 전에 쌓인 아이템을 채우는 백필용. 처리한 개수를 반환.
+     * 미분류(category=null) 또는 ETC 아이템을 AI로 일괄 재분류한다.
+     * AI 키/모델을 켜거나 고친 뒤, 그 전에 미분류로 쌓였거나 호출 실패로 ETC에 박힌
+     * 아이템을 채우는 백필용. 기존 태그는 비우고 새로 분류한다. 처리한 개수를 반환.
      */
     @Transactional
     public int reclassifyAll(Long userId) {
-        List<Item> items = itemRepository.findByUserIdAndCategoryIsNull(userId);
-        items.forEach(itemClassifier::classify);
+        List<Item> items = itemRepository.findForReclassify(userId, Category.ETC);
+        items.forEach(item -> {
+            item.clearTags();
+            itemClassifier.classify(item);
+        });
         return items.size();
     }
 }
