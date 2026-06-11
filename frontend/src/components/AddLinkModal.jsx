@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { addItem } from '../api/items'
 
 // 웹에서 링크 직접 추가 — 바텀시트. 성공 시 onAdded(item)로 피드에 즉시 반영.
@@ -6,6 +6,26 @@ function AddLinkModal({ onClose, onAdded }) {
   const [url, setUrl] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  // iOS(사파리/크롬)는 키보드가 레이아웃 뷰포트를 줄이지 않고 위에 덮는다.
+  // 그래서 바텀시트(items-end)가 키보드 뒤로 가려진다 → VisualViewport로 키보드 높이를
+  // 감지해 시트를 그만큼 위로 띄운다(margin-bottom). 키보드 없으면 0이라 무해.
+  const [kbOffset, setKbOffset] = useState(0)
+
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const update = () => {
+      const offset = window.innerHeight - vv.height - vv.offsetTop
+      setKbOffset(offset > 0 ? offset : 0)
+    }
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    update()
+    return () => {
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
+    }
+  }, [])
 
   const handlePaste = async () => {
     try {
@@ -41,7 +61,8 @@ function AddLinkModal({ onClose, onAdded }) {
       <form
         onSubmit={handleSubmit}
         onClick={(e) => e.stopPropagation()}
-        className="bg-white w-full sm:w-[24rem] rounded-t-3xl sm:rounded-3xl p-6 pb-7 shadow-2xl animate-[slideup_0.25s_ease]"
+        style={{ marginBottom: kbOffset }}
+        className="bg-white w-full sm:w-[24rem] rounded-t-3xl sm:rounded-3xl p-6 pb-7 shadow-2xl animate-[slideup_0.25s_ease] transition-[margin] duration-200 ease-out"
       >
         <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-[#e5e8eb] sm:hidden" />
         <h2 className="text-lg font-bold text-[#191f28] mb-1">링크 추가</h2>
