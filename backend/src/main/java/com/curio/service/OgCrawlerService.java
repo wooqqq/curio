@@ -1,6 +1,8 @@
 package com.curio.service;
 
 import com.curio.dto.item.OgData;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -8,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.net.URI;
 import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
 @Slf4j
@@ -21,7 +24,16 @@ public class OgCrawlerService {
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
             "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
     public OgData crawl(String url) {
+        // 유튜브는 JS 렌더링 페이지라 일반 스크래핑이 느리고(타임아웃) 제목도 못 읽는다.
+        // oEmbed API로 제목/썸네일을 빠르고 안정적으로 가져온다. 실패하면 일반 크롤로 폴백.
+        if (isYouTube(url)) {
+            OgData yt = crawlYouTube(url);
+            if (yt != null) return yt;
+        }
+
         Exception lastError = null;
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             try {
@@ -82,6 +94,47 @@ public class OgCrawlerService {
             return slug;
         } catch (Exception e) {
             return url;
+        }
+    }
+
+    private boolean isYouTube(String url) {
+        try {
+            String host = new URI(url).getHost();
+            if (host == null) return false;
+            host = host.toLowerCase();
+            return host.equals("youtu.be") || host.endsWith(".youtu.be")
+                    || host.equals("youtube.com") || host.endsWith(".youtube.com");
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * 유튜브 oEmbed로 제목·썸네일을 가져온다.
+     * 비공개/삭제 영상이거나 응답이 비정상이면 null을 반환해 일반 크롤로 폴백시킨다.
+     */
+    private OgData crawlYouTube(String url) {
+        try {
+            String endpoint = "https://www.youtube.com/oembed?format=json&url="
+                    + URLEncoder.encode(url, StandardCharsets.UTF_8);
+            String body = Jsoup.connect(endpoint)
+                    .userAgent(USER_AGENT)
+                    .ignoreContentType(true)
+                    .timeout(TIMEOUT_MS)
+                    .execute()
+                    .body();
+
+            JsonNode node = MAPPER.readTree(body);
+            String title = node.path("title").asText(null);
+            String thumbnail = node.path("thumbnail_url").asText(null);
+            if (title == null || title.isBlank()) return null;
+
+            String author = node.path("author_name").asText(null);
+            String description = (author == null || author.isBlank()) ? null : author;
+            return new OgData(trim(title, 500), trim(thumbnail, 1000), trim(description, 1000));
+        } catch (Exception e) {
+            log.warn("YouTube oEmbed failed for {}: {} — falling back to crawl", url, e.getMessage());
+            return null;
         }
     }
 
