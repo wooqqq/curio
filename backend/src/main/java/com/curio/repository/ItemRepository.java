@@ -14,8 +14,13 @@ import java.util.List;
 public interface ItemRepository extends JpaRepository<Item, Long> {
     boolean existsByUserAndNormalizedUrl(User user, String normalizedUrl);
 
-    /** 아직 분류되지 않은(category=null) 유저 아이템 — 재분류 백필용. */
-    List<Item> findByUserIdAndCategoryIsNull(Long userId);
+    /**
+     * 재분류 대상 — 미분류(category=null)이거나 ETC인 유저 아이템.
+     * ETC를 포함하는 이유: AI 호출 실패 시 ETC로 폴백되므로, 키/모델을 고친 뒤
+     * 잘못 ETC로 박힌 것까지 백필해야 한다. (정상 ETC도 다시 한 번 분류 시도 — 무해)
+     */
+    @Query("SELECT i FROM Item i WHERE i.user.id = :userId AND (i.category IS NULL OR i.category = :etc)")
+    List<Item> findForReclassify(@Param("userId") Long userId, @Param("etc") Category etc);
 
     /**
      * 사용자 아이템 조회 (카테고리 필터 + 키워드 검색).

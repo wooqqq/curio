@@ -1,5 +1,5 @@
 package com.curio.entity.enums;
 
 public enum Category {
-    DEVELOPMENT, CAREER, JOB, ETC
+    DEVELOPMENT, CAREER, ETC
 }

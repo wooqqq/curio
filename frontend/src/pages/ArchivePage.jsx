@@ -22,8 +22,7 @@ const SOURCE_LABEL = {
 const CATEGORIES = [
   { key: null, label: '전체' },
   { key: 'DEVELOPMENT', label: '개발' },
-  { key: 'CAREER', label: '커리어' },
-  { key: 'JOB', label: '취업' },
+  { key: 'CAREER', label: '커리어/취업' },
   { key: 'ETC', label: '기타' },
 ]
 
