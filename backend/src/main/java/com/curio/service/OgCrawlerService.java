@@ -70,8 +70,9 @@ public class OgCrawlerService {
      * OG 크롤링 실패/제목 부재 시 URL 슬러그에서 제목을 추정한다.
      * 예: ".../%EA%BC%BC%EC%88%98%EB%A1%9C-...-b34ee4cc2bc2" → "꼼수로 ..."
      * 슬러그가 무의미(숫자/너무 짧음)하면 호스트명으로 폴백.
+     * package-private: 순수 문자열 로직이라 같은 패키지 테스트(OgCrawlerServiceTest)로 고정한다.
      */
-    private String titleFromUrl(String url) {
+    String titleFromUrl(String url) {
         try {
             URI uri = new URI(url);
             String host = uri.getHost() != null ? uri.getHost().replaceFirst("^www\\.", "") : url;

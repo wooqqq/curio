@@ -213,6 +213,15 @@ OpenAI(gpt-4.1-mini)로 분류하다가 계정 크레딧이 소진돼 `429 insuf
 - 이유: 항상 null인 필드는 기능이 아니라 부채다. 나중에 요약이 정말 필요해지면 그때 `ClassificationResult`에 필드를 더하는 게 더 명확하다.
 - 아쉬운 점: `ddl-auto=update`는 컬럼을 드롭하지 않아 DB의 `ai_summary`는 고아로 남는다(무해). 추후 Flyway 전환 시 `DROP COLUMN`으로 정리한다.
 
+## 23. URL 중복 판정 — 쿼리를 통째로 버리지 않고 추적 파라미터만 제거 (denylist)
+
+처음 `normalizeUrl`은 중복 판정 키를 만들 때 쿼리스트링을 통째로 버렸다. `utm` 같은 추적 파라미터가 붙은 같은 링크를 중복으로 묶으려는 의도였다. 그런데 이러면 쿼리가 *의미를 갖는* 페이지까지 뭉갠다 — 단위 테스트(`ItemProcessorTest`)를 짜다가, 서로 다른 유튜브 영상(`watch?v=AAA` vs `?v=BBB`)이 같은 URL로 정규화돼 두 번째 영상 저장이 `DUPLICATE_URL`로 막히는 걸 발견했다. 검색결과(`?q=`)·페이지네이션(`?page=`)도 같은 문제다.
+
+그래서 쿼리를 보존하되 **추적 파라미터만 골라 제거**하는 denylist 방식으로 바꿨다 (`canonicalizeQuery`). `utm_*` 접두 + `fbclid`·`gclid`·`gbraid`·`msclkid`·`yclid`·`twclid`·`igshid`·`_hsenc`·`mkt_tok` 등 클릭·캠페인 ID들. 이 목록의 근거는 W3C 같은 단일 표준이 아니라 **프라이버시 도구(Brave·Firefox·ClearURLs·AdGuard)가 공통으로 제거하는 집합**에서 고빈도 항목을 추린 것이다.
+
+- 왜 denylist인가: allowlist(사이트별 의미 있는 파라미터만 남김)가 더 정확하지만 사이트마다 룰을 들고 있어야 해 유지비가 크다. 개인 아카이브 규모엔 "알려진 추적값만 제거"가 합리적 트레이드오프다.
+- 아쉬운 점: denylist라 새/미등록 추적 파라미터는 통과해 중복 제거가 안 된다. 목록도 수기 관리라 주기적 보강이 필요하다(필요 시 [ClearURLs 룰셋](https://docs.clearurls.xyz) 참고). Curio 실제 저장 데이터로 검증한 게 아니라 일반 목록 기반이다.
+
 ---
 
 ## 봇 연동 코드 흐름 (참고)

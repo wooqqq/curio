@@ -5,6 +5,9 @@
 # 진행 기록 (로컬 전용)
 PROGRESS.md
 
+# 개인 회고 노트 (비공개)
+docs/ai-growth.md
+
 # OS
 .DS_Store
 Thumbs.db

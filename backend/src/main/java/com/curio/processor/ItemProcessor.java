@@ -18,6 +18,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.net.URI;
+import java.util.Arrays;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 @Slf4j
@@ -29,6 +31,19 @@ public class ItemProcessor {
             Pattern.compile("https?://[^\\s]+", Pattern.CASE_INSENSITIVE);
     private static final Pattern IMAGE_URL_PATTERN =
             Pattern.compile(".*\\.(jpg|jpeg|png|gif|webp)(\\?.*)?$", Pattern.CASE_INSENSITIVE);
+
+    /**
+     * 페이지 식별과 무관한 추적용 쿼리 파라미터. 중복 판정 전에 제거한다(키는 소문자 비교, utm_*는 접두 매칭).
+     * 근거: 단일 표준은 없고, 프라이버시 도구(Brave·Firefox·ClearURLs·AdGuard) 공통 목록의 고빈도 항목.
+     * 설계결정 #23. 새 추적 파라미터가 보이면 여기에 추가.
+     */
+    private static final Set<String> TRACKING_PARAMS = Set.of(
+            // Google 광고/애널리틱스 (utm_* 접두는 canonicalizeQuery에서 별도 처리)
+            "gclid", "gclsrc", "dclid", "gbraid", "wbraid",
+            // 기타 광고 클릭 ID
+            "fbclid", "msclkid", "yclid", "twclid",
+            // 소셜 공유 / 메일·마케팅 자동화
+            "igshid", "igsh", "mc_cid", "mc_eid", "_hsenc", "_hsmi", "mkt_tok");
 
     private final UserRepository userRepository;
     private final ItemRepository itemRepository;
@@ -133,7 +148,8 @@ public class ItemProcessor {
         log.info("TEXT saved: userId={}", user.getId());
     }
 
-    private ItemType detectType(String utterance) {
+    // package-private: 순수 분기 로직이라 같은 패키지 테스트(ItemProcessorTest)에서 직접 검증한다.
+    ItemType detectType(String utterance) {
         if (URL_PATTERN.matcher(utterance).find()) {
             String urlPart = extractUrl(utterance);
             if (IMAGE_URL_PATTERN.matcher(urlPart).matches()) {
@@ -149,14 +165,35 @@ public class ItemProcessor {
         return matcher.find() ? matcher.group() : utterance;
     }
 
-    private String normalizeUrl(String url) {
+    // package-private: 중복 판정 기준이라 테스트(ItemProcessorTest)로 동작을 고정한다.
+    String normalizeUrl(String url) {
         try {
             URI uri = new URI(url);
             String host = uri.getHost() != null ? uri.getHost().toLowerCase() : "";
             String path = uri.getPath() != null ? uri.getPath().replaceAll("/+$", "") : "";
-            return "https://" + host + path;
+            return "https://" + host + path + canonicalizeQuery(uri.getRawQuery());
         } catch (Exception e) {
             return url;
         }
+    }
+
+    /**
+     * 추적 파라미터(utm_*, fbclid 등)만 걷어내고 의미 있는 쿼리는 보존한다.
+     * 예: youtube watch?v=xxx, 검색 ?q=... 는 남겨 서로 다른 페이지가 중복 판정되지 않게 한다.
+     * 남는 파라미터가 없으면 빈 문자열을 반환한다(원래 순서 유지).
+     */
+    private String canonicalizeQuery(String rawQuery) {
+        if (rawQuery == null || rawQuery.isBlank()) {
+            return "";
+        }
+        String kept = Arrays.stream(rawQuery.split("&"))
+                .filter(p -> !p.isBlank())
+                .filter(p -> {
+                    String key = p.split("=", 2)[0].toLowerCase();
+                    return !key.startsWith("utm_") && !TRACKING_PARAMS.contains(key);
+                })
+                .reduce((a, b) -> a + "&" + b)
+                .orElse("");
+        return kept.isEmpty() ? "" : "?" + kept;
     }
 }
