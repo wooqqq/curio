@@ -62,9 +62,6 @@ public class Item {
     @Column(nullable = false, length = 20)
     private ItemStatus status = ItemStatus.UNREAD;
 
-    @Column(columnDefinition = "TEXT")
-    private String aiSummary;
-
     @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     @JoinTable(
         name = "item_tags",

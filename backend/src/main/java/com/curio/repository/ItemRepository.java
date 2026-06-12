@@ -24,7 +24,7 @@ public interface ItemRepository extends JpaRepository<Item, Long> {
 
     /**
      * 사용자 아이템 조회 (카테고리 필터 + 키워드 검색).
-     * category, q 둘 다 null이면 전체 조회. q는 제목/본문/AI요약/태그명을 대소문자 무시 LIKE 검색.
+     * category, q 둘 다 null이면 전체 조회. q는 제목/본문/태그명을 대소문자 무시 LIKE 검색.
      */
     @Query(value = """
             SELECT DISTINCT i FROM Item i
@@ -34,7 +34,6 @@ public interface ItemRepository extends JpaRepository<Item, Long> {
               AND (:q IS NULL
                    OR LOWER(i.title) LIKE LOWER(CONCAT('%', :q, '%'))
                    OR LOWER(i.content) LIKE LOWER(CONCAT('%', :q, '%'))
-                   OR LOWER(i.aiSummary) LIKE LOWER(CONCAT('%', :q, '%'))
                    OR LOWER(t.name) LIKE LOWER(CONCAT('%', :q, '%')))
             ORDER BY i.createdAt DESC
             """,
@@ -46,7 +45,6 @@ public interface ItemRepository extends JpaRepository<Item, Long> {
               AND (:q IS NULL
                    OR LOWER(i.title) LIKE LOWER(CONCAT('%', :q, '%'))
                    OR LOWER(i.content) LIKE LOWER(CONCAT('%', :q, '%'))
-                   OR LOWER(i.aiSummary) LIKE LOWER(CONCAT('%', :q, '%'))
                    OR LOWER(t.name) LIKE LOWER(CONCAT('%', :q, '%')))
             """)
     Page<Item> search(@Param("userId") Long userId,
