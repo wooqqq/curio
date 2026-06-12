@@ -15,6 +15,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -109,7 +110,8 @@ public class GeminiService {
         return (String) ((Map<?, ?>) parts.get(0)).get("text");
     }
 
-    private ClassificationResult parseResult(String json) throws Exception {
+    // package-private: 응답 파싱 로직을 GeminiServiceTest로 직접 검증한다.
+    ClassificationResult parseResult(String json) throws Exception {
         JsonNode root = objectMapper.readTree(json);
 
         Category category = Category.ETC;
@@ -117,7 +119,9 @@ public class GeminiService {
             category = Category.valueOf(root.get("category").asText());
         } catch (Exception ignored) {}
 
-        List<String> tags = new ArrayList<>();
+        // LinkedHashSet: 첫 등장 순서를 유지하면서 중복 제거 (LLM이 같은 태그를 여러 번 반환해도
+        // item_tags에 중복 조인 행/중복 표시가 쌓이지 않게 한다).
+        LinkedHashSet<String> tags = new LinkedHashSet<>();
         JsonNode tagsNode = root.get("tags");
         if (tagsNode != null && tagsNode.isArray()) {
             for (JsonNode tag : tagsNode) {
@@ -126,7 +130,7 @@ public class GeminiService {
             }
         }
 
-        return new ClassificationResult(category, tags);
+        return new ClassificationResult(category, new ArrayList<>(tags));
     }
 
     private String buildInput(String title, String content) {
