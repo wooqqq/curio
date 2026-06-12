@@ -32,9 +32,18 @@ public class ItemProcessor {
     private static final Pattern IMAGE_URL_PATTERN =
             Pattern.compile(".*\\.(jpg|jpeg|png|gif|webp)(\\?.*)?$", Pattern.CASE_INSENSITIVE);
 
-    /** 페이지 식별과 무관한 추적용 쿼리 파라미터. 중복 판정 전에 제거한다(키는 소문자 비교, utm_*는 접두 매칭). */
-    private static final Set<String> TRACKING_PARAMS =
-            Set.of("fbclid", "gclid", "gclsrc", "dclid", "igshid", "mc_cid", "mc_eid");
+    /**
+     * 페이지 식별과 무관한 추적용 쿼리 파라미터. 중복 판정 전에 제거한다(키는 소문자 비교, utm_*는 접두 매칭).
+     * 근거: 단일 표준은 없고, 프라이버시 도구(Brave·Firefox·ClearURLs·AdGuard) 공통 목록의 고빈도 항목.
+     * 설계결정 #23. 새 추적 파라미터가 보이면 여기에 추가.
+     */
+    private static final Set<String> TRACKING_PARAMS = Set.of(
+            // Google 광고/애널리틱스 (utm_* 접두는 canonicalizeQuery에서 별도 처리)
+            "gclid", "gclsrc", "dclid", "gbraid", "wbraid",
+            // 기타 광고 클릭 ID
+            "fbclid", "msclkid", "yclid", "twclid",
+            // 소셜 공유 / 메일·마케팅 자동화
+            "igshid", "igsh", "mc_cid", "mc_eid", "_hsenc", "_hsmi", "mkt_tok");
 
     private final UserRepository userRepository;
     private final ItemRepository itemRepository;

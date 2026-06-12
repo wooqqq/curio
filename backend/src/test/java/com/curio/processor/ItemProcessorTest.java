@@ -62,4 +62,16 @@ class ItemProcessorTest {
 
         assertThat(r).isEqualTo("https://www.youtube.com/watch?v=AAA"); // v 유지, utm_ 제거
     }
+
+    @ParameterizedTest(name = "[{index}] 추적 파라미터 제거: {0}")
+    @CsvSource({
+            "'https://example.com/p?id=1&utm_source=x', 'https://example.com/p?id=1'",  // utm_ 접두
+            "'https://example.com/p?id=1&fbclid=x',     'https://example.com/p?id=1'",  // 페이스북
+            "'https://example.com/p?id=1&gclid=x',      'https://example.com/p?id=1'",  // 구글 Ads
+            "'https://example.com/p?id=1&msclkid=x',    'https://example.com/p?id=1'",  // MS/Bing
+            "'https://example.com/p?id=1&_hsenc=x',     'https://example.com/p?id=1'"   // HubSpot
+    })
+    void normalizeUrl_추적파라미터는_제거하고_나머지는_보존한다(String input, String expected) {
+        assertThat(processor.normalizeUrl(input)).isEqualTo(expected);
+    }
 }
