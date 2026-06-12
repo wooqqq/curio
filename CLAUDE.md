@@ -139,6 +139,12 @@ curio/                          ← 모노레포 루트
 - 유튜브 링크 oEmbed — 유튜브 호스트는 oEmbed로 제목·썸네일·채널명 (일반 스크래핑 타임아웃 회피), 실패 시 OG 크롤 폴백 (설계결정 #18)
 - AI 분류 Gemini 전환 — OpenAI(크레딧 소진)에서 Google Gemini 무료티어로 교체 (`GeminiService`, gemini-2.5-flash). 프롬프트·파이프라인 동일 (설계결정 #19)
 - 카테고리 커리어·취업 통합 — `Category`에서 JOB 제거, DEVELOPMENT/CAREER/ETC 3개. 세부는 태그가 담당 (설계결정 #20). AI 호출 실패 시 ETC 대신 미분류(null)로 남겨 오염 방지 (설계결정 #21)
+- 휴면 `aiSummary` 필드 제거 — 항상 null이던 죽은 필드(엔티티·DTO·검색·프론트) 정리 (설계결정 #22)
+- URL 중복 정규화 개선 — `normalizeUrl`이 쿼리를 통째로 버려 유튜브 영상이 중복 판정되던 버그 수정. 추적 파라미터(`utm_*`·`fbclid` 등)만 제거(denylist)하고 의미 있는 쿼리 보존 (설계결정 #23)
+
+### 테스트 / 문서
+- 단위 테스트 1단계 도입 — `detectType`·`normalizeUrl`·`titleFromUrl` 순수 함수 테스트(약 24케이스, `@ParameterizedTest`). 전략·로드맵은 `docs/testing.md`
+- 기능 명세서 — 노션 프로젝트 페이지 아래 인라인 DB(코드 기반 19개 기능, 대/중/소 계층번호)
 
 ---
 
