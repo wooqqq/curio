@@ -61,8 +61,9 @@ public class ItemProcessor {
         log.info("Processing item for user={} type={}", userId, type);
 
         switch (type) {
-            case LINK -> processLink(user, text);
-            case IMAGE -> processImage(user, text);
+            // 발화에 URL 앞뒤로 텍스트가 섞여도 URL만 뽑아 저장한다(웹 addLink와 동일). TEXT는 전체 보존.
+            case LINK -> processLink(user, extractUrl(text));
+            case IMAGE -> processImage(user, extractUrl(text));
             case TEXT -> processText(user, text);
         }
     }
