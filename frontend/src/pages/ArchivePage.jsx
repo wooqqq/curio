@@ -185,12 +185,6 @@ function ItemCard({ item, onRecrawl, onDelete }) {
           {titleBroken ? (domain || '제목 없음') : (item.title || item.content || '제목 없음')}
         </p>
 
-        {item.aiSummary && (
-          <p className="text-[13px] text-[#6b7684] leading-relaxed line-clamp-2 mb-2.5">
-            {item.aiSummary}
-          </p>
-        )}
-
         {item.tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {item.tags.slice(0, 3).map(tag => (

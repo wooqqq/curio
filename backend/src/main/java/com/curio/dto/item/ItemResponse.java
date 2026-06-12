@@ -17,7 +17,6 @@ public record ItemResponse(
         String originalUrl,
         Category category,
         ItemStatus status,
-        String aiSummary,
         List<String> tags,
         LocalDateTime createdAt
 ) {
@@ -31,7 +30,6 @@ public record ItemResponse(
                 item.getOriginalUrl(),
                 item.getCategory(),
                 item.getStatus(),
-                item.getAiSummary(),
                 item.getTags().stream().map(t -> t.getName()).toList(),
                 item.getCreatedAt()
         );

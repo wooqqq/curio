@@ -24,7 +24,7 @@ AI 세션 간 컨텍스트 유지용 문서. 새 세션 시작 시 이 파일부
 | 캐시/큐 | Redis |
 | ORM | Hibernate JPA (ddl-auto: update) |
 | 인증 | 카카오 OAuth2 + JWT (Access 메모리 / Refresh httpOnly 쿠키) |
-| AI | OpenAI gpt-4.1-mini |
+| AI | Google Gemini (gemini-2.5-flash, AI Studio 무료티어) |
 | 파일 | AWS S3 (키: userId/yyyy/MM/uuid.png) |
 | API 문서 | SpringDoc OpenAPI (Swagger) |
 | 프론트 | React + Vite, Tailwind CSS, Zustand |
@@ -93,7 +93,7 @@ curio/                          ← 모노레포 루트
 ## ERD 요약
 
 - `users` — 카카오 OAuth 유저
-- `items` — 저장 아이템 (LINK/IMAGE/TEXT, 카테고리: DEVELOPMENT/CAREER/JOB/ETC)
+- `items` — 저장 아이템 (LINK/IMAGE/TEXT, 카테고리: DEVELOPMENT/CAREER/ETC — 커리어·취업 통합)
 - `tags` + `item_tags` — 다대다
 - `refresh_tokens` — JWT refresh rotation
 - `announcements` — 관리자 공지 게시물
@@ -137,6 +137,8 @@ curio/                          ← 모노레포 루트
 - S3 실구축 완료 (버킷 `curio-prod-assets`, 서울) — 그 전까지 dormant였음
 - 웹에서 링크 직접 추가 — 아카이브 우하단 FAB(+) → 바텀시트, `POST /items` 동기 처리(크롤+분류+저장 후 아이템 반환, 중복 시 `DUPLICATE_URL`), 봇과 저장 로직 공유 (설계결정 #17)
 - 유튜브 링크 oEmbed — 유튜브 호스트는 oEmbed로 제목·썸네일·채널명 (일반 스크래핑 타임아웃 회피), 실패 시 OG 크롤 폴백 (설계결정 #18)
+- AI 분류 Gemini 전환 — OpenAI(크레딧 소진)에서 Google Gemini 무료티어로 교체 (`GeminiService`, gemini-2.5-flash). 프롬프트·파이프라인 동일 (설계결정 #19)
+- 카테고리 커리어·취업 통합 — `Category`에서 JOB 제거, DEVELOPMENT/CAREER/ETC 3개. 세부는 태그가 담당 (설계결정 #20). AI 호출 실패 시 ETC 대신 미분류(null)로 남겨 오염 방지 (설계결정 #21)
 
 ---
 
