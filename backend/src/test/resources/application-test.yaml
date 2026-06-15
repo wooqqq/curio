@@ -1,0 +1,28 @@
+# 슬라이스 테스트(@WebMvcTest·@DataJpaTest) 전용 프로필.
+# dev 프로필의 MySQL·카카오·DEBUG 로깅을 끌어오지 않도록 분리한다.
+spring:
+  # H2를 MySQL 호환 모드로 띄운다. 엔티티가 columnDefinition="TEXT" 등 MySQL 타입을
+  # 쓰기 때문에 순수 H2에선 DDL이 깨질 수 있어 MODE=MySQL로 맞춘다.
+  # @DataJpaTest는 @AutoConfigureTestDatabase(replace = NONE)로 이 설정을 쓰게 한다.
+  datasource:
+    url: jdbc:h2:mem:curio-test;MODE=MySQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        default_batch_fetch_size: 100
+
+# 웹 슬라이스가 import하는 CorsConfig의 ${cors.allowed-origins} 해석용.
+cors:
+  allowed-origins: http://localhost:5173
+
+# JwtUtil 등이 컨텍스트에 떠도 placeholder 해석에 실패하지 않도록 더미 값.
+jwt:
+  access-secret: test-access-secret-key-must-be-at-least-32-chars
+  refresh-secret: test-refresh-secret-key-must-be-at-least-32-chars
+  access-expiration: 1800000
+  refresh-expiration: 1209600000
