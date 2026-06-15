@@ -143,7 +143,7 @@ curio/                          ← 모노레포 루트
 - URL 중복 정규화 개선 — `normalizeUrl`이 쿼리를 통째로 버려 유튜브 영상이 중복 판정되던 버그 수정. 추적 파라미터(`utm_*`·`fbclid` 등)만 제거(denylist)하고 의미 있는 쿼리 보존 (설계결정 #23)
 
 ### 테스트 / 문서
-- 단위 테스트 1·2단계 도입 — 1단계 순수 함수(`detectType`·`normalizeUrl`·`titleFromUrl`, `@ParameterizedTest`) + 2단계 목킹(Mockito: `ItemClassifier`·`ItemProcessor.addLink`/`process`). 5클래스 ~34케이스. 테스트가 실제 버그 3건 발견·수정(유튜브 URL 중복 정규화 / AI 태그 중복 / 봇 발화 URL 미추출). 전략·로드맵은 `docs/testing.md`, 다음은 3단계(`@WebMvcTest`/`@DataJpaTest`)
+- 단위·슬라이스 테스트 1~3단계 도입 — 1단계 순수 함수(`detectType`·`normalizeUrl`·`titleFromUrl`) + 2단계 목킹(Mockito: `ItemClassifier`·`ItemProcessor`) + 3단계 슬라이스(`@WebMvcTest ItemController` 실제 SecurityConfig import / `@DataJpaTest ItemRepository.search` H2 MySQL 호환 모드, 페이징·COUNT DISTINCT 포함). 8클래스 ~59케이스. 테스트가 실제 버그 4건 발견·수정(유튜브 URL 중복 정규화 / AI 태그 중복 / 봇 발화 URL 미추출 / 미인증 응답 403→401 — 설계결정 #24). 전략·로드맵은 `docs/testing.md`, 슬라이스 전용 프로필은 `application-test.yaml`
 - 기능 명세서 — 노션 프로젝트 페이지 아래 인라인 DB(코드 기반 19개 기능, 대/중/소 계층번호)
 
 ---

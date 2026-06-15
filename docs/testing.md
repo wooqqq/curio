@@ -14,28 +14,31 @@
 
 - `spring-boot-starter-test` — JUnit 5 + Mockito + AssertJ
 - `spring-security-test` — 인증 슬라이스 테스트용
+- `h2`(testRuntimeOnly) — `@DataJpaTest`용 임베디드 DB (MySQL 호환 모드)
+- `src/test/resources/application-test.yaml` — 슬라이스 전용 프로필(`@ActiveProfiles("test")`). dev의 MySQL·카카오 설정을 끌어오지 않게 분리
 - CI(`.github/workflows/ci.yml`)가 MySQL·Redis 컨테이너로 `./gradlew test`를 실행 → **테스트를 추가하면 자동으로 머지 게이트가 된다.**
 
-별도 라이브러리 추가 없이 단위·슬라이스 테스트를 바로 쓸 수 있다.
+## 계층 (테스트 피라미드) — 1·2·3단계 모두 도입 완료
 
-## 계층 (테스트 피라미드)
+현재 8클래스 ~60케이스. `contextLoads`(`@SpringBootTest`)는 MySQL·Redis가 필요해 CI에서만 돈다.
 
 ### 1단계 — 단위 (순수 함수, DB·Spring 무관, ms 단위)
-가장 빠르고 ROI가 높다. 우선 타겟:
-- `ItemProcessor.detectType` — LINK / IMAGE / TEXT 분기 (정규식)
-- `ItemProcessor.normalizeUrl` — 중복 판정용 URL 정규화 (host 소문자, 끝 슬래시 제거)
-- `OgCrawlerService.titleFromUrl` — 크롤 실패 시 슬러그 디코딩 (유튜브 `watch` 깨짐 회귀)
-
-> `detectType`·`normalizeUrl`은 현재 `private`. 테스트를 위해 **package-private**로 연다(같은 패키지 테스트에서 호출).
+가장 빠르고 ROI가 높다. `private` 메서드는 같은 패키지 테스트에서 부르려고 **package-private**로 열었다.
+- `ItemProcessorTest` — `detectType`(LINK/IMAGE/TEXT 분기), `normalizeUrl`(중복 판정용 정규화 + 추적 파라미터 제거)
+- `OgCrawlerServiceTest` — `titleFromUrl`(크롤 실패 시 슬러그 디코딩, 유튜브 `watch` 약점 명시)
+- `GeminiServiceTest` — `parseResult`(태그 dedup·정상 파싱)
 
 ### 2단계 — 의존성 목킹 (Mockito)
 설계 결정을 코드에서 잠근다.
-- `ItemClassifier` — Gemini 호출 실패 시 `category`가 `null`로 남는지 (설계결정 #21 회귀 방어)
-- `ItemProcessor.addLink` — 중복 URL이면 `DUPLICATE_URL` 예외 (설계결정 #17)
+- `ItemClassifierTest` — Gemini 실패 시 `category`가 `null`로 남는지(설계결정 #21), 이미지·짧은 텍스트 ETC, 키 비활성 미분류
+- `ItemProcessorAddLinkTest` — 중복 URL `DUPLICATE_URL`(설계결정 #17), URL 아님 `INVALID_INPUT`, 동시 추가 제약 위반 → `DUPLICATE_URL`
+- `ItemProcessorProcessTest` — 봇 발화에 텍스트가 섞여도 URL만 추출
 
 ### 3단계 — 웹 / JPA 슬라이스
-- `@WebMvcTest` + `spring-security-test` — `ItemController`: 미인증 401, 남의 아이템 삭제 시 `ITEM_NOT_FOUND`
-- `@DataJpaTest` — `ItemRepository.search`: 제목·본문·태그 LIKE. H2로 시작하고, MySQL 의존 동작이 걸리면 Testcontainers-MySQL로 승격
+- `ItemControllerTest`(`@WebMvcTest`) — 실제 `SecurityConfig`·`CorsConfig`를 import해 인가를 그대로 태운다. 미인증 401(설계결정 #24), 남의 아이템 삭제 `ITEM_NOT_FOUND`(404), 중복 409, 입력 400, 페이지 파라미터 보정
+- `ItemRepositorySearchTest`(`@DataJpaTest`) — H2(MySQL 호환 모드). `search`의 LIKE·카테고리 필터·유저 격리·DISTINCT·정렬·다중 페이지·`COUNT DISTINCT`. MySQL 의존 동작이 걸리면 Testcontainers-MySQL로 승격 여지
+
+> 아직 빈 곳: `JwtFilter`/`JwtUtil`(토큰→principal 추출)은 직접 테스트가 없다. 슬라이스에선 `authentication()` 포스트프로세서로 우회하므로 유효 토큰 경로는 미검증.
 
 ## 컨벤션
 
@@ -46,9 +49,17 @@
 
 ## 회귀 박제 목록 (실제 겪은 버그 → 테스트로 고정)
 
+**(가) 테스트 도입 *전에* 겪고, 도입하며 함께 고정한 것**
 - 유튜브 링크 제목이 `watch`로 깨짐 → `titleFromUrl` / oEmbed 분기 (설계결정 #18)
 - Medium 링크가 raw URL로 깨짐 → `titleFromUrl` 폴백
 - AI 429 실패가 `ETC`로 오염 → 이제 `null` 유지 (설계결정 #21)
+
+**(나) 테스트를 짜다가 *새로 발견*해 고친 것** — "green ≠ 버그 없음"의 증거
+- URL 정규화가 쿼리를 통째로 버려 서로 다른 유튜브 영상이 중복 판정 → 추적 파라미터만 제거 (설계결정 #23)
+- Gemini가 같은 태그를 여러 번 반환하면 중복 누적 → `parseResult`에서 dedup
+- 봇 발화에 텍스트가 섞이면 URL을 안 뽑고 통째로 크롤 → `extractUrl`로 통일
+- 미인증 응답이 403이라 프론트 토큰 재발급이 안 됨 → 401 반환 (설계결정 #24)
+- 링크 동시 추가(TOCTOU) 시 제약 위반이 500 → `DUPLICATE_URL`로 매핑
 
 ## 실행
 

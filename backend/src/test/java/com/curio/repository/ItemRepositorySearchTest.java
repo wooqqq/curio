@@ -161,4 +161,34 @@ class ItemRepositorySearchTest {
         assertThat(result.getContent())
                 .isSortedAccordingTo(Comparator.comparing(Item::getCreatedAt).reversed());
     }
+
+    @Test
+    void 결과가_페이지_크기를_넘으면_여러_페이지로_나뉜다() {
+        for (int i = 0; i < 25; i++) {
+            link(userA, "글" + i, "본문", Category.DEVELOPMENT);
+        }
+        em.flush();
+
+        Page<Item> first = itemRepository.search(userA.getId(), null, null, PageRequest.of(0, 20));
+        assertThat(first.getContent()).hasSize(20);
+        assertThat(first.getTotalElements()).isEqualTo(25);
+        assertThat(first.getTotalPages()).isEqualTo(2);
+
+        Page<Item> second = itemRepository.search(userA.getId(), null, null, PageRequest.of(1, 20));
+        assertThat(second.getContent()).hasSize(5);
+    }
+
+    @Test
+    void 태그가_여러개여도_총개수가_부풀지_않는다() {
+        // LEFT JOIN i.tags로 아이템당 행이 태그 수만큼 생기지만 COUNT(DISTINCT i)라
+        // totalElements는 태그 행(5)이 아니라 아이템 수(2)여야 한다. 페이지네이션이 깨지던 지점.
+        link(userA, "글A", "본문", Category.DEVELOPMENT, "t1", "t2", "t3");
+        link(userA, "글B", "본문", Category.DEVELOPMENT, "t4", "t5");
+        em.flush();
+
+        Page<Item> result = itemRepository.search(userA.getId(), null, null, PageRequest.of(0, 20));
+
+        assertThat(result.getTotalElements()).isEqualTo(2);
+        assertThat(result.getContent()).hasSize(2);
+    }
 }

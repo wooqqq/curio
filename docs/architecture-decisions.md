@@ -222,6 +222,15 @@ OpenAI(gpt-4.1-mini)로 분류하다가 계정 크레딧이 소진돼 `429 insuf
 - 왜 denylist인가: allowlist(사이트별 의미 있는 파라미터만 남김)가 더 정확하지만 사이트마다 룰을 들고 있어야 해 유지비가 크다. 개인 아카이브 규모엔 "알려진 추적값만 제거"가 합리적 트레이드오프다.
 - 아쉬운 점: denylist라 새/미등록 추적 파라미터는 통과해 중복 제거가 안 된다. 목록도 수기 관리라 주기적 보강이 필요하다(필요 시 [ClearURLs 룰셋](https://docs.clearurls.xyz) 참고). Curio 실제 저장 데이터로 검증한 게 아니라 일반 목록 기반이다.
 
+## 24. 미인증 요청에 403 대신 401을 반환한다
+
+`@WebMvcTest`로 `ItemController` 인가 규칙을 검증하다가, 토큰 없는 요청이 401이 아니라 **403**으로 나가는 걸 발견했다. 원인은 `SecurityConfig`에 `AuthenticationEntryPoint`를 지정하지 않아 Spring Security 기본값인 `Http403ForbiddenEntryPoint`가 쓰인 것. 그런데 프론트 axios 인터셉터(`client.js`)는 **401에서만** 토큰 재발급(reissue)을 트리거한다. 즉 메모리의 access 토큰이 세션 중간에 만료되면 다음 요청이 403으로 떨어지고, 인터셉터가 이를 무시해 조용한 갱신이 안 된 채 화면이 깨진다. 부팅 시(새로고침) refresh 쿠키로 도는 reissue가 가려줘서 그동안 드러나지 않았다.
+
+그래서 `JwtAuthenticationEntryPoint`를 추가해 미인증 시 **401 + `ApiResponse.error(UNAUTHORIZED)`** 를 돌려주도록 했다(`SecurityConfig.exceptionHandling`에 연결). 인증은 됐지만 권한이 없는 경우(`BOT_USER_NOT_LINKED` 같은 403)는 `CurioException` 경로로 따로 처리돼 이 진입점을 타지 않으므로, 401(미인증)과 403(권한없음)의 의미가 올바르게 갈린다.
+
+- 왜 프론트(403도 reissue)가 아니라 백엔드(401 반환)를 고쳤나: 403은 "인증됐으나 권한 없음"이라는 다른 의미로 이미 쓰고 있어서, 프론트가 모든 403에 reissue를 시도하면 진짜 권한 거부 상황까지 잘못 재발급한다. 401/403을 의미대로 가르는 게 맞다.
+- 회귀 방어: `ItemControllerTest`가 미인증 401을 고정한다. prod에서도 `GET /api/v1/items`(토큰 없음) → 401 + `UNAUTHORIZED` 바디로 검증했다.
+
 ---
 
 ## 봇 연동 코드 흐름 (참고)
