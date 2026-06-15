@@ -18,6 +18,9 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ItemController {
 
+    /** 페이지 크기 상한. 클라이언트가 큰 size를 넣어도 거대 쿼리가 안 나가게 막는다. */
+    private static final int MAX_PAGE_SIZE = 100;
+
     private final ItemService itemService;
 
     @GetMapping
@@ -28,7 +31,10 @@ public class ItemController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
-        return ApiResponse.success(itemService.getItems(userId, category, q, page, size));
+        // page<0·size<1이면 PageRequest.of가 예외(→500)라, 받기 전에 안전 범위로 보정한다.
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+        return ApiResponse.success(itemService.getItems(userId, category, q, safePage, safeSize));
     }
 
     /** 웹앱에서 링크 직접 추가 (봇 없이 저장). 성공 시 저장된 아이템, 중복이면 DUPLICATE_URL. */
