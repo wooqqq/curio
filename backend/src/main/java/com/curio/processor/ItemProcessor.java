@@ -14,6 +14,7 @@ import com.curio.service.OgCrawlerService;
 import com.curio.service.S3Service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -115,7 +116,14 @@ public class ItemProcessor {
         if (itemRepository.existsByUserAndNormalizedUrl(user, normalized)) {
             throw new CurioException(ErrorCode.DUPLICATE_URL);
         }
-        return ItemResponse.from(saveLink(user, url, normalized));
+        try {
+            return ItemResponse.from(saveLink(user, url, normalized));
+        } catch (DataIntegrityViolationException e) {
+            // 위 exists 체크와 insert 사이에 같은 URL이 동시 추가되면(TOCTOU) unique 제약
+            // (uk_user_normalized_url)이 터진다. IDENTITY 전략이라 save 시점에 즉시 INSERT돼
+            // 여기서 잡힌다. 500 대신 중복으로 알린다.
+            throw new CurioException(ErrorCode.DUPLICATE_URL);
+        }
     }
 
     private void processImage(User user, String imageUrl) {
