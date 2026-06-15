@@ -231,6 +231,16 @@ OpenAI(gpt-4.1-mini)로 분류하다가 계정 크레딧이 소진돼 `429 insuf
 - 왜 프론트(403도 reissue)가 아니라 백엔드(401 반환)를 고쳤나: 403은 "인증됐으나 권한 없음"이라는 다른 의미로 이미 쓰고 있어서, 프론트가 모든 403에 reissue를 시도하면 진짜 권한 거부 상황까지 잘못 재발급한다. 401/403을 의미대로 가르는 게 맞다.
 - 회귀 방어: `ItemControllerTest`가 미인증 401을 고정한다. prod에서도 `GET /api/v1/items`(토큰 없음) → 401 + `UNAUTHORIZED` 바디로 검증했다.
 
+## 25. 링크 동시 추가 중복은 사전 체크가 아니라 DB 제약으로 막는다
+
+`addLink`은 저장 전에 `existsByUserAndNormalizedUrl`로 중복을 거른다. 그런데 이 "확인 → 저장"은 원자적이지 않다(TOCTOU). 같은 URL을 거의 동시에 두 번 보내면(웹 FAB 더블탭 등) 둘 다 "없음"으로 통과한 뒤 둘 다 insert를 시도하고, 두 번째가 unique 제약(`uk_user_normalized_url`)에 걸려 `DataIntegrityViolationException` → 500이 났다.
+
+확인-저장 사이의 틈은 락이나 직렬화로 없앨 수도 있지만, 1인~소규모 트래픽에 그건 과하다. 대신 **DB의 unique 제약을 최종 심판으로 믿고**, insert에서 터지는 제약 위반을 잡아 `DUPLICATE_URL`(409)로 매핑했다. 사전 `exists` 체크는 정상 경로에서 빠르게 거르는 용도로 남겨둔다(대부분의 중복은 동시성과 무관하게 여기서 걸린다).
+
+- 왜 잡히는 위치가 `save`인가: `Item`이 `@GeneratedValue(IDENTITY)`라 `save` 시점에 즉시 INSERT가 나가므로 예외가 그 자리에서 발생한다(트랜잭션 커밋까지 미뤄지지 않음). 그래서 `addLink` 안의 try/catch로 잡을 수 있다.
+- 봇 경로(`process`)는 비동기라 중복이면 조용히 skip하고, 레이스로 제약이 터져도 응답이 없으니 별도 매핑이 불필요하다 — 웹(`addLink`)에서만 매핑한다.
+- 회귀 방어: `ItemProcessorAddLinkTest`가 `save`의 `DataIntegrityViolationException` → `DUPLICATE_URL` 매핑을 고정한다.
+
 ---
 
 ## 봇 연동 코드 흐름 (참고)
