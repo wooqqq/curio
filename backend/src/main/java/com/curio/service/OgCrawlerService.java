@@ -1,14 +1,17 @@
 package com.curio.service;
 
 import com.curio.common.TextUtils;
+import com.curio.common.UrlGuard;
 import com.curio.dto.item.OgData;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
@@ -20,6 +23,7 @@ public class OgCrawlerService {
 
     private static final int TIMEOUT_MS = 5000;
     private static final int MAX_ATTEMPTS = 2;
+    private static final int MAX_REDIRECTS = 5;
     // 일부 사이트가 봇 UA를 차단하므로 실제 브라우저 UA 사용
     private static final String USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
@@ -28,6 +32,9 @@ public class OgCrawlerService {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     public OgData crawl(String url) {
+        // SSRF 방지: 서버가 fetch하기 전에 내부/사설 대역으로 향하는 URL을 막는다(BLOCKED_URL).
+        UrlGuard.verifyPublic(url);
+
         // 유튜브는 JS 렌더링 페이지라 일반 스크래핑이 느리고(타임아웃) 제목도 못 읽는다.
         // oEmbed API로 제목/썸네일을 빠르고 안정적으로 가져온다. 실패하면 일반 크롤로 폴백.
         if (isYouTube(url)) {
@@ -35,15 +42,11 @@ public class OgCrawlerService {
             if (yt != null) return yt;
         }
 
-        Exception lastError = null;
+        IOException lastError = null;
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             try {
-                Document doc = Jsoup.connect(url)
-                        .userAgent(USER_AGENT)
-                        .header("Accept-Language", "ko-KR,ko;q=0.9,en;q=0.8")
-                        .timeout(TIMEOUT_MS)
-                        .followRedirects(true)
-                        .get();
+                // BLOCKED_URL(CurioException)은 여기서 안 잡혀 위로 전파된다 — 네트워크 오류(IOException)만 재시도.
+                Document doc = fetchValidated(url);
 
                 String title = meta(doc, "og:title");
                 if (title == null) title = meta(doc, "twitter:title");
@@ -57,7 +60,7 @@ public class OgCrawlerService {
                 if (description == null) description = meta(doc, "twitter:description");
 
                 return new OgData(trim(title, 500), trim(thumbnail, 1000), trim(description, 1000));
-            } catch (Exception e) {
+            } catch (IOException e) {
                 lastError = e;
                 log.warn("OG crawl attempt {}/{} failed for {}: {}", attempt, MAX_ATTEMPTS, url, e.getMessage());
             }
@@ -65,6 +68,41 @@ public class OgCrawlerService {
         // 크롤링 자체가 실패해도 raw URL 대신 슬러그에서 읽을 수 있는 제목을 복원
         log.warn("OG crawl gave up for {}: {}", url, lastError != null ? lastError.getMessage() : "unknown");
         return new OgData(trim(titleFromUrl(url), 500), null, null);
+    }
+
+    /**
+     * Jsoup 자동 리다이렉트를 끄고 직접 따라가며 매 홉을 SSRF 검증한다.
+     * 공개 URL이 302로 내부 IP를 가리키는 우회를 막기 위함. 2xx면 파싱, 3xx면 Location으로 이어간다.
+     * (4xx/5xx는 Jsoup이 HttpStatusException(IOException)으로 던져 호출부에서 폴백 처리.)
+     */
+    private Document fetchValidated(String startUrl) throws IOException {
+        String current = startUrl;
+        for (int hop = 0; hop <= MAX_REDIRECTS; hop++) {
+            UrlGuard.verifyPublic(current);
+            Connection.Response res = Jsoup.connect(current)
+                    .userAgent(USER_AGENT)
+                    .header("Accept-Language", "ko-KR,ko;q=0.9,en;q=0.8")
+                    .timeout(TIMEOUT_MS)
+                    .followRedirects(false)
+                    .execute();
+
+            int code = res.statusCode();
+            if (code >= 300 && code < 400) {
+                String location = res.header("Location");
+                if (location == null || location.isBlank()) {
+                    throw new IOException("redirect without Location: " + current);
+                }
+                try {
+                    // 상대 경로 Location을 현재 URL 기준으로 절대화
+                    current = URI.create(res.url().toString()).resolve(location).toString();
+                } catch (RuntimeException e) {
+                    throw new IOException("bad redirect location: " + location, e);
+                }
+                continue;
+            }
+            return res.parse();
+        }
+        throw new IOException("too many redirects: " + startUrl);
     }
 
     /**

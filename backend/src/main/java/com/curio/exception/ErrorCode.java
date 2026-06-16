@@ -24,6 +24,7 @@ public enum ErrorCode {
     ITEM_NOT_FOUND(HttpStatus.NOT_FOUND, "ITEM_NOT_FOUND", "아이템을 찾을 수 없습니다."),
     DUPLICATE_URL(HttpStatus.CONFLICT, "DUPLICATE_URL", "이미 저장된 링크입니다."),
     RECRAWL_NOT_SUPPORTED(HttpStatus.BAD_REQUEST, "RECRAWL_NOT_SUPPORTED", "링크 타입 아이템만 다시 불러올 수 있습니다."),
+    BLOCKED_URL(HttpStatus.BAD_REQUEST, "BLOCKED_URL", "허용되지 않는 주소입니다."),
 
     // Kakao Bot
     BOT_USER_NOT_LINKED(HttpStatus.FORBIDDEN, "BOT_USER_NOT_LINKED", "카카오 봇 계정 연동이 필요합니다."),
