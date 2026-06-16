@@ -1,5 +1,6 @@
 package com.curio.entity;
 
+import com.curio.common.TextUtils;
 import com.curio.entity.enums.Category;
 import com.curio.entity.enums.ItemStatus;
 import com.curio.entity.enums.ItemType;
@@ -24,6 +25,11 @@ import java.util.List;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Item {
 
+    public static final int TITLE_MAX = 500;
+    public static final int THUMBNAIL_URL_MAX = 1000;
+    public static final int URL_MAX = 2000;
+    public static final int S3_KEY_MAX = 500;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -36,22 +42,22 @@ public class Item {
     @Column(nullable = false, length = 10)
     private ItemType type;
 
-    @Column(length = 500)
+    @Column(length = TITLE_MAX)
     private String title;
 
     @Column(columnDefinition = "TEXT")
     private String content;
 
-    @Column(length = 1000)
+    @Column(length = THUMBNAIL_URL_MAX)
     private String thumbnailUrl;
 
-    @Column(length = 2000)
+    @Column(length = URL_MAX)
     private String originalUrl;
 
-    @Column(length = 2000)
+    @Column(length = URL_MAX)
     private String normalizedUrl;
 
-    @Column(length = 500)
+    @Column(length = S3_KEY_MAX)
     private String s3Key;
 
     @Enumerated(EnumType.STRING)
@@ -84,12 +90,14 @@ public class Item {
                 String s3Key, Category category) {
         this.user = user;
         this.type = type;
-        this.title = title;
+        // 크롤 제목·URL이 컬럼 길이를 넘으면 strict 모드 insert가 롤백되므로 저장 전 자른다.
+        // content는 TEXT 컬럼이라 제한 없음.
+        this.title = TextUtils.truncate(title, TITLE_MAX);
         this.content = content;
-        this.thumbnailUrl = thumbnailUrl;
-        this.originalUrl = originalUrl;
-        this.normalizedUrl = normalizedUrl;
-        this.s3Key = s3Key;
+        this.thumbnailUrl = TextUtils.truncate(thumbnailUrl, THUMBNAIL_URL_MAX);
+        this.originalUrl = TextUtils.truncate(originalUrl, URL_MAX);
+        this.normalizedUrl = TextUtils.truncate(normalizedUrl, URL_MAX);
+        this.s3Key = TextUtils.truncate(s3Key, S3_KEY_MAX);
         this.category = category;
         this.status = ItemStatus.UNREAD;
     }
@@ -108,9 +116,9 @@ public class Item {
     }
 
     public void updateLinkMetadata(String title, String content, String thumbnailUrl) {
-        this.title = title;
+        this.title = TextUtils.truncate(title, TITLE_MAX);
         this.content = content;
-        this.thumbnailUrl = thumbnailUrl;
+        this.thumbnailUrl = TextUtils.truncate(thumbnailUrl, THUMBNAIL_URL_MAX);
     }
 
     public void updateStatus(ItemStatus status) {

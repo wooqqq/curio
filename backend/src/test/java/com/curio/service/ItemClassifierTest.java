@@ -89,6 +89,25 @@ class ItemClassifierTest {
         assertThat(item.getTags()).extracting(Tag::getName).containsExactly("spring", "jpa");
     }
 
+    @Test
+    void 긴_태그명은_50자로_자른_뒤_조회_생성한다() { // 예측 버그 #2 — 조회·저장 길이 불일치 방지
+        Item item = linkItem();
+        String longTag = "t".repeat(Tag.NAME_MAX + 20);
+        given(geminiService.isEnabled()).willReturn(true);
+        given(geminiService.classify(any(), any()))
+                .willReturn(new ClassificationResult(Category.DEVELOPMENT, List.of(longTag)));
+        given(tagRepository.findByName(any())).willReturn(Optional.empty());
+        given(tagRepository.saveAndFlush(any())).willAnswer(inv -> inv.getArgument(0));
+
+        classifier.classify(item);
+
+        // 조회는 잘린 이름으로, 저장된 태그도 50자.
+        verify(tagRepository).findByName("t".repeat(Tag.NAME_MAX));
+        assertThat(item.getTags()).singleElement()
+                .extracting(Tag::getName, org.assertj.core.api.InstanceOfAssertFactories.STRING)
+                .hasSize(Tag.NAME_MAX);
+    }
+
     private Item linkItem() {
         return Item.builder()
                 .type(ItemType.LINK)
