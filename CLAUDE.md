@@ -143,8 +143,8 @@ curio/                          ← 모노레포 루트
 - URL 중복 정규화 개선 — `normalizeUrl`이 쿼리를 통째로 버려 유튜브 영상이 중복 판정되던 버그 수정. 추적 파라미터(`utm_*`·`fbclid` 등)만 제거(denylist)하고 의미 있는 쿼리 보존 (설계결정 #23)
 
 ### 테스트 / 문서
-- 단위·슬라이스 테스트 1~3단계 도입 — 1단계 순수 함수(`detectType`·`normalizeUrl`·`titleFromUrl`·`truncate`) + 2단계 목킹(Mockito: `ItemClassifier`·`ItemProcessor`) + 3단계 슬라이스(`@WebMvcTest ItemController` 실제 SecurityConfig import / `@DataJpaTest ItemRepository.search` H2 MySQL 호환 모드, 페이징·COUNT DISTINCT 포함). 10클래스 ~70케이스. 테스트가 실제 버그 4건 발견·수정(유튜브 URL 중복 정규화 / AI 태그 중복 / 봇 발화 URL 미추출 / 미인증 응답 403→401 — 설계결정 #24). 전략·로드맵은 `docs/testing.md`, 슬라이스 전용 프로필은 `application-test.yaml`
-- 예측 버그 백로그 — 3단계 후 코드 정독으로 추린 잠재 버그 5건(PROGRESS에 정리). #1 페이지네이션 음수/0→500, #4 링크 동시추가 TOCTOU→500(설계결정 #25), #2 필드 길이 초과→500(저장 전 truncate + 이모지 surrogate 반토막 방지, 설계결정 #26)은 수정·배포 완료. #3 SSRF / #5 동기 크롤 스레드 점유는 남음
+- 단위·슬라이스 테스트 1~3단계 도입 — 1단계 순수 함수(`detectType`·`normalizeUrl`·`titleFromUrl`·`truncate`) + 2단계 목킹(Mockito: `ItemClassifier`·`ItemProcessor`) + 3단계 슬라이스(`@WebMvcTest ItemController` 실제 SecurityConfig import / `@DataJpaTest ItemRepository.search` H2 MySQL 호환 모드, 페이징·COUNT DISTINCT 포함). 11클래스 ~85케이스. 테스트가 실제 버그 4건 발견·수정(유튜브 URL 중복 정규화 / AI 태그 중복 / 봇 발화 URL 미추출 / 미인증 응답 403→401 — 설계결정 #24). 전략·로드맵은 `docs/testing.md`, 슬라이스 전용 프로필은 `application-test.yaml`
+- 예측 버그 백로그 — 3단계 후 코드 정독으로 추린 잠재 버그 5건(PROGRESS에 정리). #1 페이지네이션 음수/0→500, #4 링크 동시추가 TOCTOU→500(설계결정 #25), #2 필드 길이 초과→500(truncate + 이모지 surrogate 방지, 설계결정 #26), #3 SSRF→내부 대역 차단(설계결정 #27)은 수정·배포 완료. #5 동기 크롤 스레드 점유만 남음(SSRF의 리다이렉트 타임아웃 증폭과 얽힘)
 - 기능 명세서 — 노션 프로젝트 페이지 아래 인라인 DB(코드 기반 19개 기능, 대/중/소 계층번호)
 
 ---
