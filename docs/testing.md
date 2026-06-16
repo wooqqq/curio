@@ -20,17 +20,19 @@
 
 ## 계층 (테스트 피라미드) — 1·2·3단계 모두 도입 완료
 
-현재 8클래스 ~60케이스. `contextLoads`(`@SpringBootTest`)는 MySQL·Redis가 필요해 CI에서만 돈다.
+현재 10클래스 ~70케이스. `contextLoads`(`@SpringBootTest`)는 MySQL·Redis가 필요해 CI에서만 돈다.
 
 ### 1단계 — 단위 (순수 함수, DB·Spring 무관, ms 단위)
 가장 빠르고 ROI가 높다. `private` 메서드는 같은 패키지 테스트에서 부르려고 **package-private**로 열었다.
 - `ItemProcessorTest` — `detectType`(LINK/IMAGE/TEXT 분기), `normalizeUrl`(중복 판정용 정규화 + 추적 파라미터 제거)
 - `OgCrawlerServiceTest` — `titleFromUrl`(크롤 실패 시 슬러그 디코딩, 유튜브 `watch` 약점 명시)
 - `GeminiServiceTest` — `parseResult`(태그 dedup·정상 파싱)
+- `TextUtilsTest` — `truncate`(null 안전·길이 컷·이모지 surrogate 반토막 방지, 설계결정 #26)
+- `ItemLengthTest` — `Item` 빌더/`updateLinkMetadata`·`Tag` 생성자가 컬럼 길이로 자르는지(설계결정 #26)
 
 ### 2단계 — 의존성 목킹 (Mockito)
 설계 결정을 코드에서 잠근다.
-- `ItemClassifierTest` — Gemini 실패 시 `category`가 `null`로 남는지(설계결정 #21), 이미지·짧은 텍스트 ETC, 키 비활성 미분류
+- `ItemClassifierTest` — Gemini 실패 시 `category`가 `null`로 남는지(설계결정 #21), 이미지·짧은 텍스트 ETC, 키 비활성 미분류, 긴 태그명 50자 컷(설계결정 #26)
 - `ItemProcessorAddLinkTest` — 중복 URL `DUPLICATE_URL`(설계결정 #17), URL 아님 `INVALID_INPUT`, 동시 추가 제약 위반 → `DUPLICATE_URL`
 - `ItemProcessorProcessTest` — 봇 발화에 텍스트가 섞여도 URL만 추출
 
@@ -60,6 +62,8 @@
 - 봇 발화에 텍스트가 섞이면 URL을 안 뽑고 통째로 크롤 → `extractUrl`로 통일
 - 미인증 응답이 403이라 프론트 토큰 재발급이 안 됨 → 401 반환 (설계결정 #24)
 - 링크 동시 추가(TOCTOU) 시 제약 위반이 500 → `DUPLICATE_URL`로 매핑
+- 크롤 제목·태그·URL이 컬럼 길이를 넘으면 strict 모드 insert가 500 → 저장 전 truncate (예측 버그 #2, 설계결정 #26)
+- 그 truncate가 이모지(surrogate pair)를 반토막 내 외톨이 surrogate가 utf8mb4 저장을 깨뜨림 → 깨진 반쪽까지 버림 (설계결정 #26)
 
 ## 실행
 

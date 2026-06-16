@@ -243,6 +243,21 @@ OpenAI(gpt-4.1-mini)로 분류하다가 계정 크레딧이 소진돼 `429 insuf
 
 ---
 
+## 26. 필드 길이 초과는 저장 전 truncate로 막되, 자르는 단위와 대상을 가린다
+
+크롤 제목·AI 태그·URL은 외부에서 들어오는 값이라 길이를 보장할 수 없다. 컬럼 한도(`title` 500, `thumbnailUrl` 1000, `originalUrl`/`normalizedUrl` 2000, 태그 `name` 50)를 넘는 값을 그대로 insert하면 MySQL strict 모드에서 `DataIntegrityViolationException`이 나고, 저장이 통째로 롤백돼 500이 난다(예측 버그 백로그 #2). 저장 전에 길이를 맞춰 막기로 했다.
+
+자르는 **위치**는 엔티티의 단일 길목으로 잡았다 — `Item` 빌더/`updateLinkMetadata`, `Tag` 생성자에서 `TextUtils.truncate`로 컷. 이렇게 하면 봇 비동기 저장·웹 `addLink`·재크롤·재분류 등 모든 경로가 한 곳에서 보호된다. 컬럼 길이는 기존 값 그대로를 상수(`Item.TITLE_MAX` 등)로 옮겨 묶었을 뿐이라 `ddl-auto=update`가 스키마를 건드리지 않는다. `normalizedUrl`은 중복 판정 키라 `ItemProcessor`에서도 같은 길이로 잘라 `exists` 체크 값과 저장값이 어긋나지 않게 했다.
+
+자르는 **단위**는 자바 `String.length()`(UTF-16 코드유닛)인데, 여기서 함정이 하나 있었다. `substring`이 경계에서 surrogate pair(이모지 등 보충문자)를 반토막 내면 외톨이 high surrogate가 남고, 이건 유효한 UTF-8이 아니라서 utf8mb4 컬럼에 넣을 때 `Incorrect string value`로 **도리어 500을 일으키거나 데이터를 손상**시킨다. 즉 길이를 막으려던 코드가 거꾸로 깨뜨리는 셈. 그래서 `truncate`는 경계가 surrogate pair 한가운데면 깨진 반쪽까지 버린다. 흩어져 있던 ad-hoc `substring` 절단(`OgCrawlerService.trim`, `processText` 제목, `GeminiService` 프롬프트 입력)도 같은 버그를 안고 있어 전부 `TextUtils.truncate`로 통합했다. (한글·영어는 BMP라 자바 length = MySQL 글자 수로 1:1, 이모지만 자바가 2칸으로 세서 우리가 더 보수적으로 자른다 — 넘칠 일은 없다.)
+
+자르는 **대상**은 "잘라도 의미가 남는" 필드로 한정했다. 제목·본문·태그는 잘려도 쓸모가 있지만, URL은 한 글자라도 깨지면 죽은 링크가 된다. 그래서 `User.profileImageUrl`(현재 길이 미지정=`VARCHAR(255)`)처럼 URL이 한도를 넘을 우려가 있는 곳은 truncate 대상에서 뺐다 — 정말 막아야 하면 자르지 말고 컬럼을 넓히는 게 맞다. 다만 카카오 프로필 URL은 짧아 실제 위험이 낮아 지금은 손대지 않았다.
+
+- 아쉬운 점: 엔티티에 영속화 관심사(컬럼 길이)가 들어왔다. 도메인 순수성보다 "어느 경로로 와도 안 깨진다"는 방어를 택한 결과다. 또 `normalizedUrl`을 2000자에서 자르면 앞부분이 같은 서로 다른 초장문 URL이 같은 것으로 중복 판정될 수 있는데, 현실적으로 거의 없는 극단이라 수용했다.
+- 회귀 방어: `TextUtilsTest`(이모지 경계 포함), `entity/ItemLengthTest`(빌더·재크롤·태그 길이 컷), `ItemClassifierTest`(긴 태그명).
+
+---
+
 ## 봇 연동 코드 흐름 (참고)
 
 웹앱과 카카오 봇 사용자를 잇는 방법. 카카오 `botUserKey`만으로는 우리 유저가 누군지 모른다.
