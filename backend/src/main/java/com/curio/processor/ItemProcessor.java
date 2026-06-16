@@ -1,5 +1,6 @@
 package com.curio.processor;
 
+import com.curio.common.TextUtils;
 import com.curio.dto.item.ItemResponse;
 import com.curio.dto.item.OgData;
 import com.curio.entity.Item;
@@ -70,7 +71,9 @@ public class ItemProcessor {
     }
 
     private void processLink(User user, String url) {
-        String normalized = normalizeUrl(url);
+        // 저장 시 normalizedUrl이 컬럼 길이로 잘리므로(Item.URL_MAX), 중복 판정도 같은 값으로 해야
+        // exists 체크와 저장값이 어긋나지 않는다.
+        String normalized = TextUtils.truncate(normalizeUrl(url), Item.URL_MAX);
 
         if (itemRepository.existsByUserAndNormalizedUrl(user, normalized)) {
             log.info("Duplicate URL skipped: userId={} url={}", user.getId(), normalized);
@@ -111,7 +114,8 @@ public class ItemProcessor {
             throw new CurioException(ErrorCode.INVALID_INPUT, "올바른 링크(http/https)를 입력해주세요.");
         }
         String url = extractUrl(input.trim());
-        String normalized = normalizeUrl(url);
+        // 저장 시 잘리는 길이(Item.URL_MAX)에 맞춰 중복 판정 — processLink와 동일.
+        String normalized = TextUtils.truncate(normalizeUrl(url), Item.URL_MAX);
 
         if (itemRepository.existsByUserAndNormalizedUrl(user, normalized)) {
             throw new CurioException(ErrorCode.DUPLICATE_URL);
@@ -148,7 +152,7 @@ public class ItemProcessor {
         Item item = Item.builder()
                 .user(user)
                 .type(ItemType.TEXT)
-                .title(text.length() > 100 ? text.substring(0, 100) + "..." : text)
+                .title(text.length() > 100 ? TextUtils.truncate(text, 100) + "..." : text)
                 .content(text)
                 .build();
 

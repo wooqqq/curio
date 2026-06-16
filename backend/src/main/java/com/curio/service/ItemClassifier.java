@@ -1,5 +1,6 @@
 package com.curio.service;
 
+import com.curio.common.TextUtils;
 import com.curio.dto.item.ClassificationResult;
 import com.curio.entity.Item;
 import com.curio.entity.Tag;
@@ -56,7 +57,10 @@ public class ItemClassifier {
         }
     }
 
-    private Tag getOrCreateTag(String name) {
+    private Tag getOrCreateTag(String rawName) {
+        // 태그명도 컬럼 길이(Tag.NAME_MAX)를 넘으면 저장 시 잘리므로, 조회·생성 모두 잘린 값으로 통일해
+        // findByName(원본)과 저장값(잘린값)이 어긋나 재조회가 빗나가는 일을 막는다.
+        String name = TextUtils.truncate(rawName, Tag.NAME_MAX);
         return tagRepository.findByName(name)
                 .orElseGet(() -> {
                     try {

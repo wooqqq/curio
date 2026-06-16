@@ -1,5 +1,6 @@
 package com.curio.service;
 
+import com.curio.common.TextUtils;
 import com.curio.dto.item.ClassificationResult;
 import com.curio.entity.enums.Category;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -137,7 +138,7 @@ public class GeminiService {
         StringBuilder sb = new StringBuilder();
         if (StringUtils.hasText(title)) sb.append("Title: ").append(title).append("\n");
         if (StringUtils.hasText(content)) {
-            String trimmed = content.length() > 1000 ? content.substring(0, 1000) : content;
+            String trimmed = TextUtils.truncate(content, 1000);
             sb.append("Content: ").append(trimmed);
         }
         return sb.toString();

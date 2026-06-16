@@ -1,5 +1,6 @@
 package com.curio.service;
 
+import com.curio.common.TextUtils;
 import com.curio.dto.item.OgData;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -146,8 +147,8 @@ public class OgCrawlerService {
         return val.isBlank() ? null : val;
     }
 
+    // surrogate pair(이모지)를 반토막 내지 않도록 TextUtils.truncate에 위임한다.
     private String trim(String value, int maxLen) {
-        if (value == null) return null;
-        return value.length() > maxLen ? value.substring(0, maxLen) : value;
+        return TextUtils.truncate(value, maxLen);
     }
 }
