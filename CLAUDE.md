@@ -144,7 +144,7 @@ curio/                          ← 모노레포 루트
 
 ### 테스트 / 문서
 - 단위·슬라이스 테스트 1~3단계 도입 — 1단계 순수 함수(`detectType`·`normalizeUrl`·`titleFromUrl`·`truncate`) + 2단계 목킹(Mockito: `ItemClassifier`·`ItemProcessor`) + 3단계 슬라이스(`@WebMvcTest ItemController` 실제 SecurityConfig import / `@DataJpaTest ItemRepository.search` H2 MySQL 호환 모드, 페이징·COUNT DISTINCT 포함). 11클래스 ~85케이스. 테스트가 실제 버그 4건 발견·수정(유튜브 URL 중복 정규화 / AI 태그 중복 / 봇 발화 URL 미추출 / 미인증 응답 403→401 — 설계결정 #24). 전략·로드맵은 `docs/testing.md`, 슬라이스 전용 프로필은 `application-test.yaml`
-- 예측 버그 백로그 — 3단계 후 코드 정독으로 추린 잠재 버그 5건(PROGRESS에 정리). #1 페이지네이션 음수/0→500, #4 링크 동시추가 TOCTOU→500(설계결정 #25), #2 필드 길이 초과→500(truncate + 이모지 surrogate 방지, 설계결정 #26), #3 SSRF→내부 대역 차단(설계결정 #27)은 수정·배포 완료. #5 동기 크롤 스레드 점유만 남음(SSRF의 리다이렉트 타임아웃 증폭과 얽힘)
+- 예측 버그 백로그 — 3단계 후 코드 정독으로 추린 잠재 버그 5건(PROGRESS에 정리). #1 페이지네이션 음수/0→500, #4 링크 동시추가 TOCTOU→500(설계결정 #25), #2 필드 길이 초과→500(truncate + 이모지 surrogate 방지, 설계결정 #26), #3 SSRF→내부 대역 차단(설계결정 #27)은 수정·배포 완료. #5 동기 크롤 스레드 점유 — 시간 예산 유한화로 처리(RestTemplate 타임아웃 + 크롤 12s 데드라인, 설계결정 #29). 낙관적 비동기 전환은 트래픽이 정당화할 때로 백로그
 - 코드리뷰 발견 버그 — 테스트 작업 변경분(`b912cb3^..HEAD`)을 리뷰해 태그 동시 생성 레이스의 트랜잭션 오염(`getOrCreateTag`의 `saveAndFlush` catch가 RR에서 복구 불가 → 커밋 500·저장 유실) 수정. `INSERT IGNORE` + 잠금 읽기로 race 자체 제거(설계결정 #28)
 - 기능 명세서 — 노션 프로젝트 페이지 아래 인라인 DB(코드 기반 19개 기능, 대/중/소 계층번호)
 
