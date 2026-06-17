@@ -103,7 +103,12 @@ public class Item {
     }
 
     public void addTag(Tag tag) {
-        this.tags.add(tag);
+        // 같은 태그를 중복으로 담지 않는다(item_tags 중복 조인 행/중복 표시 방지). AI 태그 dedup(#cdf9e7c)은
+        // 원본 문자열로만 거르므로, 긴 태그가 50자로 잘려(#26·#28) 같은 Tag로 수렴하는 경계까지 여기서 닫는다.
+        // 같은 행은 같은 영속성 컨텍스트에서 동일 인스턴스라 identity contains로 충분하다.
+        if (!this.tags.contains(tag)) {
+            this.tags.add(tag);
+        }
     }
 
     /** 재분류 시 기존 태그를 비운다(join 행만 제거, 공유 Tag는 유지). 중복 누적 방지. */

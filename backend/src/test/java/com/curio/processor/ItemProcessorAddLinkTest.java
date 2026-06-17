@@ -66,6 +66,19 @@ class ItemProcessorAddLinkTest {
     }
 
     @Test
+    void addLink_URL외_무결성위반은_DUPLICATE_URL로_가리지않고_전파한다() { // 코드리뷰 ①
+        // URL unique 제약이 아닌 다른 무결성 위반(예: NOT NULL)은 가짜 '이미 저장된 링크'로 둔갑시키지 않고 그대로 올린다.
+        given(userRepository.findById(1L)).willReturn(Optional.of(mock(User.class)));
+        given(itemRepository.existsByUserAndNormalizedUrl(any(), any())).willReturn(false);
+        given(ogCrawlerService.crawl(any())).willReturn(new OgData("제목", null, null));
+        given(itemRepository.save(any()))
+                .willThrow(new DataIntegrityViolationException("Column 'content' cannot be null"));
+
+        assertThatThrownBy(() -> processor.addLink(1L, "https://example.com/a"))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
     void addLink_URL이_아니면_INVALID_INPUT_예외() {
         given(userRepository.findById(1L)).willReturn(Optional.of(mock(User.class)));
 

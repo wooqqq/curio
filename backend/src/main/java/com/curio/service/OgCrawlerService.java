@@ -2,6 +2,7 @@ package com.curio.service;
 
 import com.curio.common.TextUtils;
 import com.curio.common.UrlGuard;
+import com.curio.exception.CurioException;
 import com.curio.dto.item.OgData;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -46,7 +47,7 @@ public class OgCrawlerService {
             if (yt != null) return yt;
         }
 
-        IOException lastError = null;
+        Exception lastError = null;
         long deadline = System.currentTimeMillis() + CRAWL_BUDGET_MS;
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             if (System.currentTimeMillis() >= deadline) {
@@ -54,7 +55,6 @@ public class OgCrawlerService {
                 break;
             }
             try {
-                // BLOCKED_URL(CurioException)은 여기서 안 잡혀 위로 전파된다 — 네트워크 오류(IOException)만 재시도.
                 Document doc = fetchValidated(url, deadline);
 
                 String title = meta(doc, "og:title");
@@ -69,7 +69,12 @@ public class OgCrawlerService {
                 if (description == null) description = meta(doc, "twitter:description");
 
                 return new OgData(trim(title, 500), trim(thumbnail, 1000), trim(description, 1000));
-            } catch (IOException e) {
+            } catch (CurioException e) {
+                // BLOCKED_URL(SSRF 차단)은 폴백 없이 그대로 전파한다 — 리다이렉트가 내부 IP를 가리키는 우회를 막기 위함.
+                throw e;
+            } catch (Exception e) {
+                // 네트워크 오류(IOException)뿐 아니라 Jsoup 런타임 예외(예: 잘못된 URL의 IllegalArgumentException)도
+                // 폴백시킨다 — 동기 addLink에서 500 대신 titleFromUrl로 우아하게 강등(SSRF용 IOException 한정 이전으로 복원).
                 lastError = e;
                 log.warn("OG crawl attempt {}/{} failed for {}: {}", attempt, MAX_ATTEMPTS, url, e.getMessage());
             }

@@ -57,4 +57,15 @@ class ItemLengthTest {
 
         assertThat(tag.getName()).hasSize(Tag.NAME_MAX);
     }
+
+    @Test
+    void 같은_태그를_두번_담아도_한번만_들어간다() { // 코드리뷰 ② — truncate로 같은 Tag로 수렴해도 중복 방지
+        Item item = Item.builder().type(ItemType.LINK).build();
+        Tag tag = Tag.builder().name("spring").build();
+
+        item.addTag(tag);
+        item.addTag(tag); // 같은 인스턴스(같은 행) 재추가 = 잘린 태그가 수렴하는 경우와 동치
+
+        assertThat(item.getTags()).containsExactly(tag);
+    }
 }
