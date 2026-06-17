@@ -1,10 +1,14 @@
 package com.curio.service;
 
+import com.curio.exception.CurioException;
+import com.curio.exception.ErrorCode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * titleFromUrl 단위 테스트. 네트워크를 타지 않는 순수 문자열 로직이라 의존성 없이 검증한다.
@@ -36,5 +40,22 @@ class OgCrawlerServiceTest {
     @Test
     void titleFromUrl_유튜브watch는_watch로_깨진다_oEmbed로_보완() {
         assertThat(crawler.titleFromUrl("https://www.youtube.com/watch")).isEqualTo("watch");
+    }
+
+    /**
+     * SSRF 방지: crawl()은 fetch 전에 UrlGuard로 내부/비http 주소를 막는다(설계결정 #27).
+     * 검증이 네트워크 호출 전에 BLOCKED_URL을 던지므로 외부 통신 없이 확인된다.
+     */
+    @ParameterizedTest(name = "[{index}] {0} 차단")
+    @ValueSource(strings = {
+            "http://169.254.169.254/latest/meta-data/",
+            "http://127.0.0.1/",
+            "http://192.168.0.1/",
+            "ftp://example.com/x"
+    })
+    void crawl_내부_또는_비http_주소는_BLOCKED_URL로_막는다(String url) {
+        assertThatThrownBy(() -> crawler.crawl(url))
+                .isInstanceOf(CurioException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.BLOCKED_URL);
     }
 }

@@ -20,7 +20,7 @@
 
 ## 계층 (테스트 피라미드) — 1·2·3단계 모두 도입 완료
 
-현재 10클래스 ~70케이스. `contextLoads`(`@SpringBootTest`)는 MySQL·Redis가 필요해 CI에서만 돈다.
+현재 11클래스 ~85케이스. `contextLoads`(`@SpringBootTest`)는 MySQL·Redis가 필요해 CI에서만 돈다.
 
 ### 1단계 — 단위 (순수 함수, DB·Spring 무관, ms 단위)
 가장 빠르고 ROI가 높다. `private` 메서드는 같은 패키지 테스트에서 부르려고 **package-private**로 열었다.
@@ -29,6 +29,8 @@
 - `GeminiServiceTest` — `parseResult`(태그 dedup·정상 파싱)
 - `TextUtilsTest` — `truncate`(null 안전·길이 컷·이모지 surrogate 반토막 방지, 설계결정 #26)
 - `ItemLengthTest` — `Item` 빌더/`updateLinkMetadata`·`Tag` 생성자가 컬럼 길이로 자르는지(설계결정 #26)
+- `UrlGuardTest` — `verifyPublic`(SSRF: 내부/사설/비http 차단·공개 IPv4/IPv6 통과, 설계결정 #27)
+- `OgCrawlerServiceTest` — `crawl`이 fetch 전 내부/비http를 `BLOCKED_URL`로 막는지(설계결정 #27)
 
 ### 2단계 — 의존성 목킹 (Mockito)
 설계 결정을 코드에서 잠근다.
@@ -64,6 +66,9 @@
 - 링크 동시 추가(TOCTOU) 시 제약 위반이 500 → `DUPLICATE_URL`로 매핑
 - 크롤 제목·태그·URL이 컬럼 길이를 넘으면 strict 모드 insert가 500 → 저장 전 truncate (예측 버그 #2, 설계결정 #26)
 - 그 truncate가 이모지(surrogate pair)를 반토막 내 외톨이 surrogate가 utf8mb4 저장을 깨뜨림 → 깨진 반쪽까지 버림 (설계결정 #26)
+
+**(다) 코드 정독으로 예측해 선제 차단한 것** (예측 버그 백로그)
+- 임의 URL을 서버가 fetch해 내부 자원에 닿는 SSRF → fetch 전 IP 대역 검증, 리다이렉트 매 홉 재검증 (예측 버그 #3, 설계결정 #27)
 
 ## 실행
 

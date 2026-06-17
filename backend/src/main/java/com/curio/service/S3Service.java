@@ -1,5 +1,6 @@
 package com.curio.service;
 
+import com.curio.common.UrlGuard;
 import com.curio.exception.CurioException;
 import com.curio.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -11,10 +12,13 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;
@@ -23,6 +27,9 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class S3Service {
+
+    /** 이미지 다운로드 상한 — 무제한이면 초대용량 URL로 메모리 폭증(DoS) 위험. */
+    private static final int MAX_DOWNLOAD_BYTES = 10 * 1024 * 1024;
 
     private final S3Client s3Client;
 
@@ -38,6 +45,8 @@ public class S3Service {
             return null;
         }
         try {
+            // SSRF 방지: 내부/사설 대역으로 향하면 BLOCKED_URL → 아래 catch에서 null(다운로드 안 함).
+            UrlGuard.verifyPublic(imageUrl);
             byte[] data = downloadBytes(imageUrl);
             String contentType = detectContentType(imageUrl);
             String ext = contentType.contains("png") ? "png" : "jpg";
@@ -128,10 +137,23 @@ public class S3Service {
     }
 
     private byte[] downloadBytes(String url) throws Exception {
-        HttpClient client = HttpClient.newHttpClient();
-        HttpRequest request = HttpRequest.newBuilder(URI.create(url)).GET().build();
-        HttpResponse<byte[]> response = client.send(request, HttpResponse.BodyHandlers.ofByteArray());
-        return response.body();
+        // 리다이렉트는 따라가지 않는다 — 302로 내부 IP를 가리키는 SSRF 우회 차단(검증은 verifyPublic이 초기 URL에 대해 수행).
+        HttpClient client = HttpClient.newBuilder()
+                .followRedirects(HttpClient.Redirect.NEVER)
+                .connectTimeout(Duration.ofSeconds(5))
+                .build();
+        HttpRequest request = HttpRequest.newBuilder(URI.create(url))
+                .timeout(Duration.ofSeconds(10))
+                .GET().build();
+        HttpResponse<InputStream> response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
+        try (InputStream in = response.body()) {
+            // 상한+1만큼 읽어 초과 여부를 판별한다(전체를 메모리에 올리지 않도록 캡).
+            byte[] data = in.readNBytes(MAX_DOWNLOAD_BYTES + 1);
+            if (data.length > MAX_DOWNLOAD_BYTES) {
+                throw new IOException("download exceeds " + MAX_DOWNLOAD_BYTES + " bytes");
+            }
+            return data;
+        }
     }
 
     private String buildKey(Long userId, String ext) {
