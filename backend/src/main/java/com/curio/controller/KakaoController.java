@@ -3,6 +3,7 @@ package com.curio.controller;
 import com.curio.dto.kakao.KakaoSkillRequest;
 import com.curio.dto.kakao.KakaoSkillResponse;
 import com.curio.entity.User;
+import com.curio.entity.enums.ItemType;
 import com.curio.repository.UserRepository;
 import com.curio.service.LinkCodeService;
 import com.curio.service.queue.QueueService;
@@ -32,20 +33,28 @@ public class KakaoController {
     @PostMapping("/skill")
     public KakaoSkillResponse skill(@RequestBody KakaoSkillRequest request) {
         String botUserKey = extractBotUserKey(request);
-        String utterance = extractUtterance(request);
-
-        if (!StringUtils.hasText(botUserKey) || !StringUtils.hasText(utterance)) {
+        if (!StringUtils.hasText(botUserKey)) {
             return KakaoSkillResponse.text("요청을 처리할 수 없어요. 다시 시도해주세요.");
         }
 
-        log.debug("Kakao skill request: botUserKey={} utterance={}", botUserKey, utterance);
+        // 사진 업로드면 명시적 media.url을 쓴다 — utterance 정규식 매칭 우연에 기대지 않는다(설계결정 #30).
+        Optional<String> imageUrl = extractUploadedImageUrl(request);
+        String utterance = extractUtterance(request);
+
+        if (imageUrl.isEmpty() && !StringUtils.hasText(utterance)) {
+            return KakaoSkillResponse.text("요청을 처리할 수 없어요. 다시 시도해주세요.");
+        }
+
+        log.debug("Kakao skill request: botUserKey={} image={} utterance={}", botUserKey, imageUrl.isPresent(), utterance);
 
         Optional<User> userOpt = userRepository.findByBotUserKey(botUserKey);
 
-        // 연동 코드 입력 처리
-        String upperUtterance = utterance.trim().toUpperCase();
-        if (LINK_CODE_PATTERN.matcher(upperUtterance).matches()) {
-            return handleLinkCode(botUserKey, upperUtterance, userOpt);
+        // 연동 코드 입력 처리 (텍스트일 때만 — 이미지는 코드가 아니다)
+        if (imageUrl.isEmpty()) {
+            String upperUtterance = utterance.trim().toUpperCase();
+            if (LINK_CODE_PATTERN.matcher(upperUtterance).matches()) {
+                return handleLinkCode(botUserKey, upperUtterance, userOpt);
+            }
         }
 
         // 미연동 유저
@@ -57,11 +66,32 @@ public class KakaoController {
             );
         }
 
-        // 연동된 유저 → 아이템 저장
+        // 연동된 유저 → 아이템 저장. 이미지는 IMAGE로 명시, 그 외는 null로 자동 감지(텍스트/링크).
         Long userId = userOpt.get().getId();
-        queueService.enqueue(userId, utterance.trim());
+        if (imageUrl.isPresent()) {
+            queueService.enqueue(userId, imageUrl.get(), ItemType.IMAGE);
+        } else {
+            queueService.enqueue(userId, utterance.trim(), null);
+        }
 
         return KakaoSkillResponse.text("📌 저장 중이에요!\n잠시 후 아카이브에서 확인하세요.");
+    }
+
+    /**
+     * 사진 업로드면 이미지 URL을 돌려준다. 카카오는 사진 전송 시 userRequest.params.media(type=image, url)에
+     * 이미지 URL을 명시로 담고 flow.trigger.type=IMAGE_UPLOAD를 준다(실측, 설계결정 #30). URL을 직접 들고 있는
+     * media를 기준으로 판별한다 — utterance가 비거나 형식이 달라도 안전하다.
+     */
+    private Optional<String> extractUploadedImageUrl(KakaoSkillRequest request) {
+        try {
+            KakaoSkillRequest.UserRequest.Media media = request.getUserRequest().getParams().getMedia();
+            if (media != null && "image".equalsIgnoreCase(media.getType()) && StringUtils.hasText(media.getUrl())) {
+                return Optional.of(media.getUrl().trim());
+            }
+        } catch (NullPointerException ignored) {
+            // params/media 없음 → 이미지 아님
+        }
+        return Optional.empty();
     }
 
     private KakaoSkillResponse handleLinkCode(String botUserKey, String code, Optional<User> userOpt) {

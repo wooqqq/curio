@@ -54,12 +54,13 @@ public class ItemProcessor {
     private final ItemClassifier itemClassifier;
 
     @Transactional
-    public void process(Long userId, String utterance) {
+    public void process(Long userId, String content, ItemType forcedType) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CurioException(ErrorCode.USER_NOT_FOUND));
 
-        String text = utterance.trim();
-        ItemType type = detectType(text);
+        String text = content.trim();
+        // 카카오가 명시한 타입(IMAGE_UPLOAD)이 있으면 그걸 쓰고, 없으면(텍스트/링크/붙여넣은 이미지 URL) 내용으로 감지.
+        ItemType type = forcedType != null ? forcedType : detectType(text);
         log.info("Processing item for user={} type={}", userId, type);
 
         switch (type) {

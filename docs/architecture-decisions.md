@@ -298,6 +298,19 @@ AI 분류가 돌려준 태그를 `getOrCreateTag`가 "있으면 읽고 없으면
 
 ---
 
+## 30. 카톡 사진 첨부 저장 — 카카오가 주는 명시 신호(media.url)를 IMAGE로 처리한다
+
+"카톡으로 사진을 보내면 저장"은 오래 "알려진 빚"으로 남아 있었다. 전제는 *오픈빌더가 사진을 스킬 서버로 안 넘기거나 넘겨도 DTO가 버린다*였다. 실측해보니(스킬 요청 원본 본문을 임시 로깅) 전제가 틀렸다 — 사진을 보내면 오픈빌더가 **`flow.trigger.type = "IMAGE_UPLOAD"`** 와 함께 **`userRequest.params.media = {type:"image", url: <kakaocdn 이미지 URL>}`** 을 주고, 같은 URL을 `utterance`에도 실어준다. 즉 입력단이 막힌 게 아니었다. 오히려 기존 파이프라인이 우연히 이미 처리하고 있었다 — `detectType`의 이미지 URL 정규식이 `...i_<hash>.png?...`를 매치해 IMAGE로 분기 → `S3Service.uploadFromUrl`이 kakaocdn에서 받아 S3에 올리고 썸네일 → 저장(제목 "이미지"). prod에서 썸네일까지 정상 확인.
+
+문제는 그게 **`utterance`를 이미지 URL 정규식으로 맞히는 우연**에 기댄다는 점이다 — kakaocdn URL이 깔끔한 확장자로 안 끝나거나, 카카오가 utterance에 URL을 안 싣는 쪽으로 바뀌면 링크(웹페이지)로 오인해 엉뚱하게 크롤한다. 그래서 **명시 신호를 우선**하도록 견고화했다. `KakaoSkillRequest`에 `params.media`·`flow`를 추가하고, 컨트롤러가 `media.type=="image"`면 `media.url`을 꺼내 큐에 **타입을 IMAGE로 못박아** 넣는다. 큐 계약을 `enqueue(userId, content, ItemType)`로 넓혀(`null`이면 기존대로 자동 감지) 봇 비동기 경로가 명시 타입을 받는다. 이렇게 하면 URL 형식과 무관하게 사진은 항상 이미지로 저장된다.
+
+별도의 멀티파트 업로드 수신·단기 URL 교환 같은 건 필요 없었다 — 카카오가 공개적으로 접근 가능한 이미지 URL을 주고(`expires`가 붙은 서명 URL), 우리는 그걸 즉시 S3로 복사(`uploadFromUrl`, SSRF 가드 #27·10MB 상한 통과)해 영구 보관하므로 만료도 무관하다.
+
+- 아쉬운 점 / 한계: 사진 제목이 늘 "이미지"로 동일하다(본문/OG가 없어 끌어올 게 없음) — 날짜 접미사나 AI 비전 캡션은 별도 작업으로 남긴다. `media.type`이 image가 아닌 미디어(동영상·파일)는 이미지로 안 잡고 흘려보낸다(현재 범위는 이미지만). 측정에 쓴 원본 본문 로깅 필터는 파악 후 제거했다(사용자 발화가 로그에 남아 상시 운영 부적합).
+- 회귀 방어: `KakaoControllerTest` — 실측한 사진 업로드 JSON을 그대로 역직렬화해 `media.url`을 IMAGE로 큐에 넣는지 / 텍스트 발화는 타입 미지정으로 넣는지. `ItemProcessorProcessTest` — 명시 IMAGE면 확장자 없는 URL도 업로드(정규식 의존 X).
+
+---
+
 ## 봇 연동 코드 흐름 (참고)
 
 웹앱과 카카오 봇 사용자를 잇는 방법. 카카오 `botUserKey`만으로는 우리 유저가 누군지 모른다.
