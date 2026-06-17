@@ -42,7 +42,10 @@
 - `ItemControllerTest`(`@WebMvcTest`) — 실제 `SecurityConfig`·`CorsConfig`를 import해 인가를 그대로 태운다. 미인증 401(설계결정 #24), 남의 아이템 삭제 `ITEM_NOT_FOUND`(404), 중복 409, 입력 400, 페이지 파라미터 보정
 - `ItemRepositorySearchTest`(`@DataJpaTest`) — H2(MySQL 호환 모드). `search`의 LIKE·카테고리 필터·유저 격리·DISTINCT·정렬·다중 페이지·`COUNT DISTINCT`. MySQL 의존 동작이 걸리면 Testcontainers-MySQL로 승격 여지
 
-> 아직 빈 곳: `JwtFilter`/`JwtUtil`(토큰→principal 추출)은 직접 테스트가 없다. 슬라이스에선 `authentication()` 포스트프로세서로 우회하므로 유효 토큰 경로는 미검증.
+### 인증 핵심 경로 — 보안 단위 테스트
+슬라이스(`@WebMvcTest`)는 `authentication()` 포스트프로세서로 필터를 우회하므로, 토큰→principal 경로는 직접 테스트로 따로 고정한다.
+- `JwtUtilTest` — access/refresh 발급→userId 복원, **키 격리**(access를 refresh 키로 검증 시 실패, 역도), 변조·비JWT·만료 토큰 검증 실패, 같은 유저 연속 발급 시 **jti로 토큰 비중복**(설계결정 #11 회귀 방어)
+- `JwtFilterTest` — 유효 Bearer 토큰이면 `SecurityContext`에 userId를 principal로 주입, 헤더 없음/비Bearer/무효/만료면 인증하지 않음(체인은 항상 진행 → 이후 401은 `JwtAuthenticationEntryPoint` 담당, #24)
 
 ## 컨벤션
 
