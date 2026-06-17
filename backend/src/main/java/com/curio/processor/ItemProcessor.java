@@ -124,10 +124,23 @@ public class ItemProcessor {
             return ItemResponse.from(saveLink(user, url, normalized));
         } catch (DataIntegrityViolationException e) {
             // 위 exists 체크와 insert 사이에 같은 URL이 동시 추가되면(TOCTOU) unique 제약
-            // (uk_user_normalized_url)이 터진다. IDENTITY 전략이라 save 시점에 즉시 INSERT돼
-            // 여기서 잡힌다. 500 대신 중복으로 알린다.
-            throw new CurioException(ErrorCode.DUPLICATE_URL);
+            // (uk_user_normalized_url)이 터진다. IDENTITY 전략이라 save 시점에 즉시 INSERT돼 여기서 잡힌다.
+            // 단 URL 중복 위반일 때만 409로 매핑하고, 그 외 무결성 위반은 가짜 DUPLICATE_URL로 가리지 않고 전파한다.
+            if (isUrlDuplicate(e)) {
+                throw new CurioException(ErrorCode.DUPLICATE_URL);
+            }
+            throw e;
         }
+    }
+
+    /**
+     * items의 URL unique 제약(uk_user_normalized_url) 위반인지 메시지로 판별한다.
+     * MySQL은 "Duplicate entry '...' for key 'items.uk_user_normalized_url'"를 던지므로 제약명이 메시지에 담긴다.
+     * 다른 제약(NOT NULL 등) 위반을 DUPLICATE_URL로 오표기하지 않기 위함.
+     */
+    private boolean isUrlDuplicate(DataIntegrityViolationException e) {
+        String message = e.getMostSpecificCause().getMessage();
+        return message != null && message.toLowerCase().contains("uk_user_normalized_url");
     }
 
     private void processImage(User user, String imageUrl) {
