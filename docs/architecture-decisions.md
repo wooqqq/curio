@@ -271,6 +271,19 @@ OpenAI(gpt-4.1-mini)로 분류하다가 계정 크레딧이 소진돼 `429 insuf
 
 ---
 
+## 28. 태그 get-or-create는 예외를 잡지 말고 INSERT IGNORE로 race를 없앤다
+
+AI 분류가 돌려준 태그를 `getOrCreateTag`가 "있으면 읽고 없으면 만든다"로 처리하는데, 이 메서드는 `@Transactional`(웹 `addLink`·봇 `process`·`reclassifyAll`) 안에서 돈다. 기존 구현은 `tagRepository.saveAndFlush(...)`로 insert를 강제하고, 동시에 같은 태그가 들어와 `tags.name` unique 제약이 터지면 `DataIntegrityViolationException`을 잡아 다시 조회해 재사용하는 "낙관적 복구" 패턴이었다. 코드 리뷰에서 이 패턴이 실제로는 복구가 아님을 확인했다 — JPA에서 **flush 예외는 영속성 컨텍스트를 오염시키고 트랜잭션을 rollback-only로 마킹**한다. 예외를 잡아 진행해도 본 트랜잭션의 커밋이 `UnexpectedRollbackException`(500)으로 터지고 **아이템 저장 자체가 유실**된다. `java`·`ai`처럼 흔한 신규 태그를 두 사용자가 거의 동시에 만들면 도달하는, 조용한 동시성 버그였다.
+
+별도 트랜잭션(`REQUIRES_NEW`)으로 태그만 빼서 만드는 흔한 처방도 여기선 안 통한다. MySQL 기본 격리수준이 **REPEATABLE READ**라, 본 트랜잭션은 첫 읽기 시점 스냅샷을 들고 있어 그 뒤 다른(중첩 포함) 트랜잭션이 커밋한 행을 일반 SELECT로는 못 본다. 만든 태그를 본 트랜잭션이 못 읽으면 `@ManyToMany` 연결도 깨진다.
+
+그래서 **예외 경로 자체를 없애는** 쪽으로 갔다. `INSERT IGNORE INTO tags(name)`(`TagRepository.insertIgnore`, 네이티브)로 원자적 insert를 하면 중복이어도 예외 없이 0행 처리돼 트랜잭션이 오염되지 않는다. 직후 재조회는 **잠금 읽기**(`findByNameForUpdate`, `@Lock(PESSIMISTIC_WRITE)` = `SELECT … FOR UPDATE`)로 한다 — 잠금 읽기는 RR 스냅샷을 우회해 '최신 커밋'을 보므로, 내가 방금 넣었든 옆 트랜잭션이 동시에 만들었든 그 행을 확실히 잡는다. 읽어온 태그는 본 트랜잭션 컨텍스트에서 managed라 cascade도 detached 문제 없이 동작한다. 빠른 경로(이미 있는 태그)는 잠금 없는 평범한 `findByName`으로 먼저 거른다.
+
+- 아쉬운 점 / 한계: `INSERT IGNORE`는 **MySQL 전용**이다 — 운영이 MySQL 8로 고정돼 수용했지만, 훗날 DB를 바꾸면 이 한 줄을 다시 봐야 한다. `INSERT IGNORE`가 unique 외의 에러(길이 초과 등)도 조용히 삼키는 점은, 길이를 설계결정 #26에서 이미 truncate로 막아둬 실질 위험이 없다. 진짜 동시성 회귀는 MySQL 통합 테스트라야 재현되는데, 현재 단위(목킹)·슬라이스(H2) 계층을 벗어나 보류했다 — 단위 테스트로는 "충돌 시 `saveAndFlush`가 아니라 `insertIgnore` 경로를 탄다"까지만 박제했다.
+- 회귀 방어: `ItemClassifierTest` — 신규 태그가 `insertIgnore` + 잠금 재조회로 확보되는지, 50자 truncate(#26)가 조회·insert에 일관 적용되는지. `@DataJpaTest`(H2)로 새 리포지토리 메서드가 포함된 JPA 컨텍스트 부팅·JPQL 유효성 확인.
+
+---
+
 ## 봇 연동 코드 흐름 (참고)
 
 웹앱과 카카오 봇 사용자를 잇는 방법. 카카오 `botUserKey`만으로는 우리 유저가 누군지 모른다.
