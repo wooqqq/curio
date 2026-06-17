@@ -1,5 +1,6 @@
 package com.curio.service.queue;
 
+import com.curio.entity.enums.ItemType;
 import com.curio.processor.ItemProcessor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Async;
@@ -13,7 +14,7 @@ public class AsyncQueueService implements QueueService {
 
     @Override
     @Async("itemProcessorExecutor")
-    public void enqueue(Long userId, String utterance) {
-        itemProcessor.process(userId, utterance);
+    public void enqueue(Long userId, String content, ItemType type) {
+        itemProcessor.process(userId, content, type);
     }
 }
