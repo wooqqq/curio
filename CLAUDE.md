@@ -141,6 +141,7 @@ curio/                          ← 모노레포 루트
 - 카테고리 커리어·취업 통합 — `Category`에서 JOB 제거, DEVELOPMENT/CAREER/ETC 3개. 세부는 태그가 담당 (설계결정 #20). AI 호출 실패 시 ETC 대신 미분류(null)로 남겨 오염 방지 (설계결정 #21)
 - 휴면 `aiSummary` 필드 제거 — 항상 null이던 죽은 필드(엔티티·DTO·검색·프론트) 정리 (설계결정 #22)
 - URL 중복 정규화 개선 — `normalizeUrl`이 쿼리를 통째로 버려 유튜브 영상이 중복 판정되던 버그 수정. 추적 파라미터(`utm_*`·`fbclid` 등)만 제거(denylist)하고 의미 있는 쿼리 보존 (설계결정 #23)
+- 카톡 사진 첨부 저장 — 카카오가 사진 전송 시 `params.media.url`(+`flow.trigger=IMAGE_UPLOAD`)로 이미지 URL을 줌. `media.url`을 IMAGE로 명시 처리(큐 계약 `enqueue(userId, content, ItemType)`로 확장) → kakaocdn→S3 복사→썸네일 저장. 기존 "알려진 빚"이 사실은 동작 중이었고 정규식 우연 의존을 명시 신호로 견고화 (설계결정 #30)
 
 ### 테스트 / 문서
 - 단위·슬라이스 테스트 1~3단계 도입 — 1단계 순수 함수(`detectType`·`normalizeUrl`·`titleFromUrl`·`truncate`) + 2단계 목킹(Mockito: `ItemClassifier`·`ItemProcessor`) + 3단계 슬라이스(`@WebMvcTest ItemController` 실제 SecurityConfig import / `@DataJpaTest ItemRepository.search` H2 MySQL 호환 모드, 페이징·COUNT DISTINCT 포함) + 인증 핵심 경로 직접 테스트(`JwtUtilTest`·`JwtFilterTest` — 토큰 발급·검증·키 격리·만료, 토큰→principal 주입). 13클래스 ~100케이스. 테스트가 실제 버그 4건 발견·수정(유튜브 URL 중복 정규화 / AI 태그 중복 / 봇 발화 URL 미추출 / 미인증 응답 403→401 — 설계결정 #24). 전략·로드맵은 `docs/testing.md`, 슬라이스 전용 프로필은 `application-test.yaml`
