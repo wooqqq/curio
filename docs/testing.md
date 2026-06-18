@@ -20,7 +20,7 @@
 
 ## 계층 (테스트 피라미드) — 1·2·3단계 모두 도입 완료
 
-현재 11클래스 ~85케이스. `contextLoads`(`@SpringBootTest`)는 MySQL·Redis가 필요해 CI에서만 돈다.
+현재 15클래스 ~117케이스. `contextLoads`(`@SpringBootTest`)는 MySQL·Redis가 필요해 CI에서만 돈다.
 
 ### 1단계 — 단위 (순수 함수, DB·Spring 무관, ms 단위)
 가장 빠르고 ROI가 높다. `private` 메서드는 같은 패키지 테스트에서 부르려고 **package-private**로 열었다.
@@ -36,11 +36,13 @@
 설계 결정을 코드에서 잠근다.
 - `ItemClassifierTest` — Gemini 실패 시 `category`가 `null`로 남는지(설계결정 #21), 이미지·짧은 텍스트 ETC, 키 비활성 미분류, 긴 태그명 50자 컷(설계결정 #26)
 - `ItemProcessorAddLinkTest` — 중복 URL `DUPLICATE_URL`(설계결정 #17), URL 아님 `INVALID_INPUT`, 동시 추가 제약 위반 → `DUPLICATE_URL`
-- `ItemProcessorProcessTest` — 봇 발화에 텍스트가 섞여도 URL만 추출
+- `ItemProcessorProcessTest` — 봇 발화에 텍스트가 섞여도 URL만 추출, 명시 IMAGE면 확장자 없는 URL도 업로드, **사진 기본 제목이 날짜형(`M월 d일 사진`)**인지 저장 Item 캡처 검증(설계결정 #31)
 
 ### 3단계 — 웹 / JPA 슬라이스
-- `ItemControllerTest`(`@WebMvcTest`) — 실제 `SecurityConfig`·`CorsConfig`를 import해 인가를 그대로 태운다. 미인증 401(설계결정 #24), 남의 아이템 삭제 `ITEM_NOT_FOUND`(404), 중복 409, 입력 400, 페이지 파라미터 보정
+- `ItemControllerTest`(`@WebMvcTest`) — 실제 `SecurityConfig`·`CorsConfig`를 import해 인가를 그대로 태운다. 미인증 401(설계결정 #24), 남의 아이템 삭제/수정 `ITEM_NOT_FOUND`(404), 중복 409, 입력 400, 페이지 파라미터 보정, **PATCH 제목/메모 수정 위임·미인증 401**(설계결정 #31)
 - `ItemRepositorySearchTest`(`@DataJpaTest`) — H2(MySQL 호환 모드). `search`의 LIKE·카테고리 필터·유저 격리·DISTINCT·정렬·다중 페이지·`COUNT DISTINCT`. MySQL 의존 동작이 걸리면 Testcontainers-MySQL로 승격 여지
+- `KakaoControllerTest`(`@WebMvcTest`) — 실측 사진/텍스트 스킬 JSON 역직렬화 → `media.url`을 IMAGE로, 텍스트는 타입 미지정으로 큐잉(설계결정 #30)
+- `ItemEditTest` — 사용자가 고친 제목은 재크롤(`updateLinkMetadata`)이 안 덮어쓰는지(`titleEditedByUser`), 메모 빈 문자열은 null, 제목·메모 길이 컷(설계결정 #31)
 
 ### 인증 핵심 경로 — 보안 단위 테스트
 슬라이스(`@WebMvcTest`)는 `authentication()` 포스트프로세서로 필터를 우회하므로, 토큰→principal 경로는 직접 테스트로 따로 고정한다.
@@ -72,6 +74,9 @@
 
 **(다) 코드 정독으로 예측해 선제 차단한 것** (예측 버그 백로그)
 - 임의 URL을 서버가 fetch해 내부 자원에 닿는 SSRF → fetch 전 IP 대역 검증, 리다이렉트 매 홉 재검증 (예측 버그 #3, 설계결정 #27)
+
+**(라) 플래키(비결정) 테스트를 결정화한 것**
+- `JwtUtilTest` 변조 검증이 서명의 **마지막 base64 글자**를 `A↔B`로 바꿔 검증했는데, 32바이트 HMAC의 base64url 마지막 글자는 안 쓰는 하위 비트가 있어 `A/B/C/D`가 같은 바이트로 디코딩 → 약 1/16 확률로 동일 토큰이 돼 검증 통과(테스트 실패). 헤더 첫 글자 변조로 바꿔 항상 내용이 달라지게 결정화. (교훈: 변조 테스트는 바이트가 실제로 바뀌는 지점을 골라야 한다 — base64 끝글자 금지)
 
 ## 실행
 
