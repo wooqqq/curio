@@ -30,7 +30,19 @@ Curio 로컬 개발 환경을 띄우고 내린다. **백엔드는 이 스킬이 
 3. **백엔드는 건드리지 않는다** — IDE 인스턴스는 사용자가 직접 멈춘다고 안내.
 
 ## status — 상태 확인
-- `docker ps`로 컨테이너 상태, 5173(Vite)·8080(백엔드) 포트 LISTEN 여부를 확인해 한눈에 보고한다. 8080이 떠 있으면 "IDE 백엔드 실행 중"으로 해석한다.
+인자가 `status`면 **아무것도 켜거나 끄지 않고** 현재 무엇이 떠 있는지만 한눈에 보고한다.
+
+1. **Docker 데몬**: `docker ps`가 데몬 연결 실패면 Docker Desktop 꺼짐 → MySQL·Redis는 전부 "내려감"으로 처리하고 컨테이너 점검은 건너뛴다.
+2. **컨테이너**: `curio-mysql`·`curio-redis` 각각
+   `docker inspect -f '{{.State.Status}} / {{.State.Health.Status}}' curio-mysql` 로 실행+health 확인. 컨테이너가 없으면(`No such object`) "내려감".
+3. **포트**: PowerShell `Get-NetTCPConnection -LocalPort N -State Listen` 으로 5173(Vite)·8080(백엔드) LISTEN 여부.
+4. **보고**: 아래처럼 컴포넌트별 상태표로 정리한다(이모지로 한눈에).
+   - MySQL (curio-mysql) — 🟢 healthy / 🟡 실행 중(health 대기) / 🔴 내려감
+   - Redis (curio-redis) — 🟢 healthy / 🟡 실행 중 / 🔴 내려감
+   - Vite (5173) — 🟢 실행 중 / ⚪ 안 띄움
+   - 백엔드 (8080) — 🟢 IDE 실행 중 / ⚪ 미실행 (이 스킬이 띄우지 않음)
+
+   8080이 떠 있으면 "IDE 백엔드 실행 중", 안 떠 있으면 "IDE에서 직접 띄워야 함"으로 해석해 한 줄 덧붙인다.
 
 ## 주의
 - 포트 점유 프로세스 조회/종료는 PowerShell(`Get-NetTCPConnection -LocalPort N -State Listen`)을 쓴다.
