@@ -7,6 +7,7 @@ import client from '../api/client'
 import useAuthStore from '../store/authStore'
 import PopupModal from '../components/PopupModal'
 import AddLinkModal from '../components/AddLinkModal'
+import ItemDetailModal from '../components/ItemDetailModal'
 
 const TYPE_ICON = {
   LINK: '🔗',
@@ -123,18 +124,21 @@ function LinkCodeModal({ onClose }) {
   )
 }
 
-function ItemCard({ item, onRecrawl, onDelete }) {
+function ItemCard({ item, onRecrawl, onDelete, onOpenDetail }) {
   const [recrawling, setRecrawling] = useState(false)
   const [recrawlError, setRecrawlError] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const domain = getDomain(item.originalUrl)
   const source = domain || SOURCE_LABEL[item.type] || '링크'
-  const clickable = Boolean(item.originalUrl)
   // 저장 당시 크롤링 실패로 제목 자리에 raw URL이 들어간 경우
   const titleBroken = item.type === 'LINK' && /^https?:\/\//i.test(item.title || '')
 
-  const handleClick = () => {
-    if (clickable) window.open(item.originalUrl, '_blank', 'noopener')
+  // 본문 탭 = 상세 시트(제목·메모 수정), 썸네일 탭 = 원문 바로 열기
+  const handleClick = () => onOpenDetail(item)
+
+  const handleThumbClick = (e) => {
+    e.stopPropagation()
+    if (item.originalUrl) window.open(item.originalUrl, '_blank', 'noopener')
   }
 
   const handleRecrawl = async (e) => {
@@ -168,9 +172,7 @@ function ItemCard({ item, onRecrawl, onDelete }) {
   return (
     <div
       onClick={handleClick}
-      className={`group bg-white rounded-2xl flex items-start gap-3 p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_16px_rgba(0,0,0,0.04)] transition-all duration-200 ${
-        clickable ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgba(0,0,0,0.06),0_12px_28px_rgba(0,0,0,0.08)]' : ''
-      }`}
+      className="group bg-white rounded-2xl flex items-start gap-3 p-4 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_16px_rgba(0,0,0,0.04)] transition-all duration-200 cursor-pointer hover:-translate-y-0.5 hover:shadow-[0_2px_4px_rgba(0,0,0,0.06),0_12px_28px_rgba(0,0,0,0.08)]"
     >
       {/* 본문 */}
       <div className="flex-1 min-w-0">
@@ -184,6 +186,13 @@ function ItemCard({ item, onRecrawl, onDelete }) {
         <p className="text-[15px] font-bold text-[#191f28] leading-snug line-clamp-2 mb-1">
           {titleBroken ? (domain || '제목 없음') : (item.title || item.content || '제목 없음')}
         </p>
+
+        {item.memo && (
+          <p className="flex items-center gap-1 text-[13px] text-[#6b7684] line-clamp-1 mb-1.5">
+            <span className="shrink-0">🗒️</span>
+            <span className="truncate">{item.memo}</span>
+          </p>
+        )}
 
         {item.tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
@@ -213,12 +222,13 @@ function ItemCard({ item, onRecrawl, onDelete }) {
         )}
       </div>
 
-      {/* 썸네일 */}
+      {/* 썸네일 — 탭하면 원문 바로 열기(본문 탭=상세와 구분) */}
       {item.thumbnailUrl && (
         <img
           src={item.thumbnailUrl}
           alt=""
-          className="shrink-0 w-16 h-16 object-cover rounded-xl bg-[#f2f4f6]"
+          onClick={handleThumbClick}
+          className="shrink-0 w-16 h-16 object-cover rounded-xl bg-[#f2f4f6] cursor-pointer"
           onError={e => { e.currentTarget.style.display = 'none' }}
         />
       )}
@@ -250,6 +260,7 @@ function ArchivePage() {
   const [loading, setLoading] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
+  const [detailItem, setDetailItem] = useState(null)
   const [isAdmin, setIsAdmin] = useState(false)
   const logoutStore = useAuthStore(s => s.logout)
 
@@ -307,6 +318,11 @@ function ArchivePage() {
     setTotalCount(c => c + 1)
   }, [])
 
+  // 상세에서 제목/메모 저장 → 피드 카드 즉시 갱신
+  const handleSaved = useCallback((updated) => {
+    setItems(prev => prev.map(it => (it.id === updated.id ? updated : it)))
+  }, [])
+
   const handleLogout = async () => {
     try { await logout() } catch (_) {}
     logoutStore()
@@ -317,6 +333,13 @@ function ArchivePage() {
     <div className="min-h-screen bg-[#f2f4f6]">
       {showModal && <LinkCodeModal onClose={() => setShowModal(false)} />}
       {showAddModal && <AddLinkModal onClose={() => setShowAddModal(false)} onAdded={handleAdded} />}
+      {detailItem && (
+        <ItemDetailModal
+          item={detailItem}
+          onClose={() => setDetailItem(null)}
+          onSaved={handleSaved}
+        />
+      )}
       <PopupModal />
 
       {/* 헤더 (frosted) */}
@@ -424,7 +447,7 @@ function ArchivePage() {
               </p>
             </div>
           ) : (
-            items.map(item => <ItemCard key={item.id} item={item} onRecrawl={handleRecrawl} onDelete={handleDelete} />)
+            items.map(item => <ItemCard key={item.id} item={item} onRecrawl={handleRecrawl} onDelete={handleDelete} onOpenDetail={setDetailItem} />)
           )}
 
           {loading && (

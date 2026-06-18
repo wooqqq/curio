@@ -3,6 +3,7 @@ package com.curio.controller;
 import com.curio.dto.ApiResponse;
 import com.curio.dto.item.AddItemRequest;
 import com.curio.dto.item.ItemResponse;
+import com.curio.dto.item.UpdateItemRequest;
 import com.curio.entity.enums.Category;
 import com.curio.service.ItemService;
 import jakarta.validation.Valid;
@@ -44,6 +45,16 @@ public class ItemController {
             @Valid @RequestBody AddItemRequest request
     ) {
         return ApiResponse.success(itemService.addLink(userId, request.url()));
+    }
+
+    /** 아이템 제목/메모 수정. {title?, memo?} 부분 업데이트. 본인 소유 아니면 ITEM_NOT_FOUND. */
+    @PatchMapping("/{id}")
+    public ApiResponse<ItemResponse> update(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateItemRequest request
+    ) {
+        return ApiResponse.success(itemService.update(userId, id, request));
     }
 
     @PostMapping("/{id}/recrawl")

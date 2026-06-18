@@ -2,6 +2,7 @@ package com.curio.service;
 
 import com.curio.dto.item.ItemResponse;
 import com.curio.dto.item.OgData;
+import com.curio.dto.item.UpdateItemRequest;
 import com.curio.entity.Item;
 import com.curio.entity.enums.Category;
 import com.curio.entity.enums.ItemType;
@@ -61,6 +62,32 @@ public class ItemService {
 
         OgData og = ogCrawlerService.crawl(item.getOriginalUrl());
         item.updateLinkMetadata(og.title(), og.description(), og.thumbnailUrl());
+        return ItemResponse.from(item);
+    }
+
+    /**
+     * 아이템의 제목/메모를 부분 수정한다. 본인 소유가 아니면 ITEM_NOT_FOUND.
+     * title이 공백만이면 INVALID_INPUT, 제목을 고치면 이후 재크롤이 덮어쓰지 않게 표시된다.
+     */
+    @Transactional
+    public ItemResponse update(Long userId, Long itemId, UpdateItemRequest request) {
+        Item item = itemRepository.findById(itemId)
+                .orElseThrow(() -> new CurioException(ErrorCode.ITEM_NOT_FOUND));
+
+        if (!item.getUser().getId().equals(userId)) {
+            throw new CurioException(ErrorCode.ITEM_NOT_FOUND);
+        }
+
+        if (request.title() != null) {
+            String title = request.title().trim();
+            if (title.isEmpty()) {
+                throw new CurioException(ErrorCode.INVALID_INPUT);
+            }
+            item.editTitle(title);
+        }
+        if (request.memo() != null) {
+            item.updateMemo(request.memo());
+        }
         return ItemResponse.from(item);
     }
 

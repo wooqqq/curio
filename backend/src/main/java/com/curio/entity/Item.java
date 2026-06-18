@@ -26,6 +26,7 @@ import java.util.List;
 public class Item {
 
     public static final int TITLE_MAX = 500;
+    public static final int MEMO_MAX = 1000;
     public static final int THUMBNAIL_URL_MAX = 1000;
     public static final int URL_MAX = 2000;
     public static final int S3_KEY_MAX = 500;
@@ -44,6 +45,17 @@ public class Item {
 
     @Column(length = TITLE_MAX)
     private String title;
+
+    /** 사용자가 직접 적은 한 줄 메모. AI/원본에서 온 content와 출처가 다르므로 별도 컬럼. */
+    @Column(length = MEMO_MAX)
+    private String memo;
+
+    /**
+     * 사용자가 제목을 직접 고쳤는지. true면 재크롤(updateLinkMetadata)이 제목을 덮어쓰지 않는다.
+     * "제목 다시 불러오기"에 사용자가 손본 제목이 날아가는 사고를 막는다.
+     */
+    @Column(nullable = false)
+    private boolean titleEditedByUser = false;
 
     @Column(columnDefinition = "TEXT")
     private String content;
@@ -121,9 +133,23 @@ public class Item {
     }
 
     public void updateLinkMetadata(String title, String content, String thumbnailUrl) {
-        this.title = TextUtils.truncate(title, TITLE_MAX);
+        // 사용자가 제목을 직접 고친 적 있으면 재크롤이 덮어쓰지 않는다(content·썸네일은 갱신).
+        if (!this.titleEditedByUser) {
+            this.title = TextUtils.truncate(title, TITLE_MAX);
+        }
         this.content = content;
         this.thumbnailUrl = TextUtils.truncate(thumbnailUrl, THUMBNAIL_URL_MAX);
+    }
+
+    /** 사용자가 제목을 직접 수정한다. 이후 재크롤/재분류가 덮어쓰지 않도록 플래그를 세운다. */
+    public void editTitle(String title) {
+        this.title = TextUtils.truncate(title, TITLE_MAX);
+        this.titleEditedByUser = true;
+    }
+
+    /** 사용자 메모를 갱신한다. 빈 문자열이면 메모를 비운다(null). */
+    public void updateMemo(String memo) {
+        this.memo = (memo == null || memo.isBlank()) ? null : TextUtils.truncate(memo, MEMO_MAX);
     }
 
     public void updateStatus(ItemStatus status) {

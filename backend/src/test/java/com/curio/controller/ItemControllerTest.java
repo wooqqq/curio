@@ -28,6 +28,7 @@ import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -126,5 +127,40 @@ class ItemControllerTest {
                         .content("{\"url\":\"\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+    }
+
+    @Test
+    void 제목_메모_수정은_principal의_userId로_위임한다() throws Exception {
+        given(itemService.update(eq(7L), eq(5L), any())).willReturn(null);
+
+        mockMvc.perform(patch("/api/v1/items/5")
+                        .with(authentication(asUser(7L)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"내가 고친 제목\",\"memo\":\"나중에 읽기\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("SUCCESS"));
+
+        verify(itemService).update(eq(7L), eq(5L), any());
+    }
+
+    @Test
+    void 남의_아이템_수정은_404_ITEM_NOT_FOUND() throws Exception {
+        given(itemService.update(any(), any(), any()))
+                .willThrow(new CurioException(ErrorCode.ITEM_NOT_FOUND));
+
+        mockMvc.perform(patch("/api/v1/items/99")
+                        .with(authentication(asUser(7L)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memo\":\"x\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ITEM_NOT_FOUND"));
+    }
+
+    @Test
+    void 미인증_수정은_401() throws Exception {
+        mockMvc.perform(patch("/api/v1/items/5")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"memo\":\"x\"}"))
+                .andExpect(status().isUnauthorized());
     }
 }

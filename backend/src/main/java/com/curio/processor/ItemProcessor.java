@@ -20,7 +20,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.net.URI;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -33,6 +36,9 @@ public class ItemProcessor {
             Pattern.compile("https?://[^\\s]+", Pattern.CASE_INSENSITIVE);
     private static final Pattern IMAGE_URL_PATTERN =
             Pattern.compile(".*\\.(jpg|jpeg|png|gif|webp)(\\?.*)?$", Pattern.CASE_INSENSITIVE);
+    /** 사진 첨부의 기본 제목(예: "6월 18일 사진"). 사용자가 상세에서 수정 가능. */
+    private static final DateTimeFormatter IMAGE_TITLE_FORMAT =
+            DateTimeFormatter.ofPattern("M월 d일 사진", Locale.KOREAN);
 
     /**
      * 페이지 식별과 무관한 추적용 쿼리 파라미터. 중복 판정 전에 제거한다(키는 소문자 비교, utm_*는 접두 매칭).
@@ -151,7 +157,9 @@ public class ItemProcessor {
         Item item = Item.builder()
                 .user(user)
                 .type(ItemType.IMAGE)
-                .title("이미지")
+                // 기본 제목을 "이미지" 대신 날짜형으로(예: "6월 18일 사진") — 안 고쳐도 멀쩡하게.
+                // 사용자는 상세 화면에서 직접 수정할 수 있다.
+                .title(LocalDate.now().format(IMAGE_TITLE_FORMAT))
                 .originalUrl(imageUrl)
                 .thumbnailUrl(thumbnailUrl)
                 .s3Key(s3Key)
