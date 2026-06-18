@@ -9,6 +9,9 @@ export const getItems = (category, page = 0, size = 20, q = '') => {
 
 export const addItem = (url) => client.post('/items', { url })
 
+// 제목/메모 부분 수정 ({ title?, memo? })
+export const updateItem = (id, body) => client.patch(`/items/${id}`, body)
+
 export const recrawlItem = (id) => client.post(`/items/${id}/recrawl`)
 
 export const deleteItem = (id) => client.delete(`/items/${id}`)

@@ -1,6 +1,7 @@
 package com.curio.processor;
 
 import com.curio.dto.item.OgData;
+import com.curio.entity.Item;
 import com.curio.entity.User;
 import com.curio.entity.enums.ItemType;
 import com.curio.repository.ItemRepository;
@@ -10,12 +11,17 @@ import com.curio.service.OgCrawlerService;
 import com.curio.service.S3Service;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -64,5 +70,19 @@ class ItemProcessorProcessTest {
         processor.process(1L, "https://talk.kakaocdn.net/dna/abc/i_hash?credential=x", ItemType.IMAGE);
 
         verify(s3Service).uploadFromUrl(eq("https://talk.kakaocdn.net/dna/abc/i_hash?credential=x"), any());
+    }
+
+    @Test
+    void process_이미지_기본제목은_날짜형이다() { // "이미지" 대신 "M월 d일 사진"으로 저장(사용자가 상세에서 수정 가능)
+        given(userRepository.findById(1L)).willReturn(Optional.of(mock(User.class)));
+
+        processor.process(1L, "https://example.com/a.png", ItemType.IMAGE);
+
+        ArgumentCaptor<Item> captor = ArgumentCaptor.forClass(Item.class);
+        verify(itemRepository).save(captor.capture());
+
+        String expected = LocalDate.now().format(DateTimeFormatter.ofPattern("M월 d일 사진", Locale.KOREAN));
+        assertThat(captor.getValue().getType()).isEqualTo(ItemType.IMAGE);
+        assertThat(captor.getValue().getTitle()).isEqualTo(expected);
     }
 }
