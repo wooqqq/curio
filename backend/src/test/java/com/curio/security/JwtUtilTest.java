@@ -51,8 +51,11 @@ class JwtUtilTest {
     @Test
     void 변조된_토큰은_검증에_실패한다() {
         String token = jwtUtil.generateAccessToken(1L);
-        char last = token.charAt(token.length() - 1);
-        String tampered = token.substring(0, token.length() - 1) + (last == 'A' ? 'B' : 'A');
+        // 서명의 마지막 base64 문자는 안 쓰는 하위 비트가 있어 다른 문자로 바꿔도 같은 바이트로
+        // 디코딩될 수 있다(A/B/C/D가 동일) → 마지막 글자 변조는 플래키. 항상 내용이 바뀌도록
+        // 헤더 첫 글자를 변조한다(헤더 바이트가 바뀌면 서명 검증이 반드시 실패).
+        char first = token.charAt(0);
+        String tampered = (first == 'a' ? 'b' : 'a') + token.substring(1);
 
         assertThat(jwtUtil.validateAccessToken(tampered)).isFalse();
     }
