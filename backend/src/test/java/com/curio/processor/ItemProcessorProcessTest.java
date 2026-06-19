@@ -85,4 +85,18 @@ class ItemProcessorProcessTest {
         assertThat(captor.getValue().getType()).isEqualTo(ItemType.IMAGE);
         assertThat(captor.getValue().getTitle()).isEqualTo(expected);
     }
+
+    @Test
+    void process_이미지는_업로드한_바이트를_그대로_비전분류에_재사용한다() { // 설계결정 #32 — 재다운로드 없음
+        given(userRepository.findById(1L)).willReturn(Optional.of(mock(User.class)));
+        byte[] bytes = {1, 2, 3, 4};
+        given(s3Service.uploadFromUrl(any(), any()))
+                .willReturn(new S3Service.DownloadedImage("1/2026/06/x.jpg", bytes, "image/png"));
+
+        processor.process(1L, "https://example.com/a.png", ItemType.IMAGE);
+
+        // classify(텍스트 경로)가 아니라 classifyImage로, 업로드가 돌려준 바로 그 바이트·mime을 넘겨야 한다.
+        verify(itemClassifier).classifyImage(any(Item.class), eq(bytes), eq("image/png"));
+        verify(itemRepository).save(any());
+    }
 }

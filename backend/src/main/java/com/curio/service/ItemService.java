@@ -1,9 +1,11 @@
 package com.curio.service;
 
+import com.curio.common.TextUtils;
 import com.curio.dto.item.ItemResponse;
 import com.curio.dto.item.OgData;
 import com.curio.dto.item.UpdateItemRequest;
 import com.curio.entity.Item;
+import com.curio.entity.Tag;
 import com.curio.entity.enums.Category;
 import com.curio.entity.enums.ItemType;
 import com.curio.exception.CurioException;
@@ -27,6 +29,7 @@ public class ItemService {
     private final OgCrawlerService ogCrawlerService;
     private final ItemClassifier itemClassifier;
     private final ItemProcessor itemProcessor;
+    private final TagService tagService;
 
     /**
      * 웹앱에서 링크를 직접 추가한다(봇 없이 저장). 동기 처리 후 저장된 아이템을 반환.
@@ -50,12 +53,7 @@ public class ItemService {
      */
     @Transactional
     public ItemResponse recrawl(Long userId, Long itemId) {
-        Item item = itemRepository.findById(itemId)
-                .orElseThrow(() -> new CurioException(ErrorCode.ITEM_NOT_FOUND));
-
-        if (!item.getUser().getId().equals(userId)) {
-            throw new CurioException(ErrorCode.ITEM_NOT_FOUND);
-        }
+        Item item = loadOwned(userId, itemId);
         if (item.getType() != ItemType.LINK || item.getOriginalUrl() == null) {
             throw new CurioException(ErrorCode.RECRAWL_NOT_SUPPORTED);
         }
@@ -66,17 +64,12 @@ public class ItemService {
     }
 
     /**
-     * 아이템의 제목/메모를 부분 수정한다. 본인 소유가 아니면 ITEM_NOT_FOUND.
-     * title이 공백만이면 INVALID_INPUT, 제목을 고치면 이후 재크롤이 덮어쓰지 않게 표시된다.
+     * 아이템의 제목/메모/카테고리를 부분 수정한다. 본인 소유가 아니면 ITEM_NOT_FOUND.
+     * title이 공백만이면 INVALID_INPUT. 제목·카테고리를 고치면 이후 재크롤/재분류가 덮어쓰지 않게 표시된다(#31·#33).
      */
     @Transactional
     public ItemResponse update(Long userId, Long itemId, UpdateItemRequest request) {
-        Item item = itemRepository.findById(itemId)
-                .orElseThrow(() -> new CurioException(ErrorCode.ITEM_NOT_FOUND));
-
-        if (!item.getUser().getId().equals(userId)) {
-            throw new CurioException(ErrorCode.ITEM_NOT_FOUND);
-        }
+        Item item = loadOwned(userId, itemId);
 
         if (request.title() != null) {
             String title = request.title().trim();
@@ -88,6 +81,30 @@ public class ItemService {
         if (request.memo() != null) {
             item.updateMemo(request.memo());
         }
+        if (request.category() != null) {
+            item.editCategory(request.category());
+        }
+        return ItemResponse.from(item);
+    }
+
+    /** 아이템에 태그를 추가한다(사용자 수동). 빈 이름이면 INVALID_INPUT. 본인 소유 아니면 ITEM_NOT_FOUND. */
+    @Transactional
+    public ItemResponse addTag(Long userId, Long itemId, String name) {
+        Item item = loadOwned(userId, itemId);
+        String trimmed = name == null ? "" : name.trim();
+        if (trimmed.isEmpty()) {
+            throw new CurioException(ErrorCode.INVALID_INPUT);
+        }
+        item.addTag(tagService.getOrCreate(trimmed)); // addTag는 멱등 — 중복이면 무시
+        return ItemResponse.from(item);
+    }
+
+    /** 아이템에서 태그를 뗀다(join 행만 제거, 공유 Tag는 유지). 본인 소유 아니면 ITEM_NOT_FOUND. */
+    @Transactional
+    public ItemResponse removeTag(Long userId, Long itemId, String name) {
+        Item item = loadOwned(userId, itemId);
+        // 저장된 태그명은 NAME_MAX로 잘려 있으므로, 떼낼 때도 같은 기준으로 맞춰 비교한다.
+        item.removeTagByName(TextUtils.truncate(name == null ? "" : name.trim(), Tag.NAME_MAX));
         return ItemResponse.from(item);
     }
 
@@ -97,14 +114,17 @@ public class ItemService {
      */
     @Transactional
     public void delete(Long userId, Long itemId) {
+        itemRepository.delete(loadOwned(userId, itemId));
+    }
+
+    /** 아이템을 찾고 본인 소유인지 검증한다. 없거나 남의 것이면 ITEM_NOT_FOUND(존재 비노출). */
+    private Item loadOwned(Long userId, Long itemId) {
         Item item = itemRepository.findById(itemId)
                 .orElseThrow(() -> new CurioException(ErrorCode.ITEM_NOT_FOUND));
-
         if (!item.getUser().getId().equals(userId)) {
             throw new CurioException(ErrorCode.ITEM_NOT_FOUND);
         }
-
-        itemRepository.delete(item);
+        return item;
     }
 
     /**

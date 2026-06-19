@@ -18,8 +18,10 @@ public interface ItemRepository extends JpaRepository<Item, Long> {
      * 재분류 대상 — 미분류(category=null)이거나 ETC인 유저 아이템.
      * ETC를 포함하는 이유: AI 호출 실패 시 ETC로 폴백되므로, 키/모델을 고친 뒤
      * 잘못 ETC로 박힌 것까지 백필해야 한다. (정상 ETC도 다시 한 번 분류 시도 — 무해)
+     * 단 사용자가 카테고리를 직접 고친 것(categoryEditedByUser)은 제외 — 정정을 백필이 되돌리지 않게(#33).
      */
-    @Query("SELECT i FROM Item i WHERE i.user.id = :userId AND (i.category IS NULL OR i.category = :etc)")
+    @Query("SELECT i FROM Item i WHERE i.user.id = :userId AND i.categoryEditedByUser = false "
+            + "AND (i.category IS NULL OR i.category = :etc)")
     List<Item> findForReclassify(@Param("userId") Long userId, @Param("etc") Category etc);
 
     /**

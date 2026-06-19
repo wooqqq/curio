@@ -3,6 +3,7 @@ package com.curio.controller;
 import com.curio.dto.ApiResponse;
 import com.curio.dto.item.AddItemRequest;
 import com.curio.dto.item.ItemResponse;
+import com.curio.dto.item.TagRequest;
 import com.curio.dto.item.UpdateItemRequest;
 import com.curio.entity.enums.Category;
 import com.curio.service.ItemService;
@@ -55,6 +56,26 @@ public class ItemController {
             @Valid @RequestBody UpdateItemRequest request
     ) {
         return ApiResponse.success(itemService.update(userId, id, request));
+    }
+
+    /** 아이템에 태그 추가(사용자 수동). 성공 시 갱신된 아이템. 본인 소유 아니면 ITEM_NOT_FOUND. */
+    @PostMapping("/{id}/tags")
+    public ApiResponse<ItemResponse> addTag(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long id,
+            @Valid @RequestBody TagRequest request
+    ) {
+        return ApiResponse.success(itemService.addTag(userId, id, request.name()));
+    }
+
+    /** 아이템에서 태그 제거. 이름은 쿼리 파라미터(한글·공백은 URL 인코딩). 성공 시 갱신된 아이템. */
+    @DeleteMapping("/{id}/tags")
+    public ApiResponse<ItemResponse> removeTag(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long id,
+            @RequestParam String name
+    ) {
+        return ApiResponse.success(itemService.removeTag(userId, id, name));
     }
 
     @PostMapping("/{id}/recrawl")
