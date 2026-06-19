@@ -5,7 +5,6 @@ import com.curio.entity.Item;
 import com.curio.entity.Tag;
 import com.curio.entity.enums.Category;
 import com.curio.entity.enums.ItemType;
-import com.curio.repository.TagRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -13,7 +12,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -22,14 +20,15 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 /**
- * ItemClassifier 단위 테스트 (GeminiService·TagRepository 목킹).
- * 핵심: AI 호출 실패를 ETC로 굳히지 않고 미분류(null)로 남기는 동작(설계결정 #21) 회귀 방어.
+ * ItemClassifier 단위 테스트 (GeminiService·TagService·S3Service 목킹).
+ * 핵심: AI 호출 실패를 ETC로 굳히지 않고 미분류(null)로 남기는 동작(#21) + 이미지 비전 분류(#32) 회귀 방어.
+ * 태그 get-or-create 자체(race/truncation)는 TagService로 빠져 TagServiceTest가 담당한다(#33).
  */
 @ExtendWith(MockitoExtension.class)
 class ItemClassifierTest {
 
     @Mock GeminiService geminiService;
-    @Mock TagRepository tagRepository;
+    @Mock TagService tagService;
     @Mock S3Service s3Service;
     @InjectMocks ItemClassifier classifier;
 
@@ -42,9 +41,7 @@ class ItemClassifierTest {
                 .willReturn(new S3Service.DownloadedImage("1/2026/06/x.jpg", new byte[]{1, 2, 3}, "image/jpeg"));
         given(geminiService.classifyImage(any(), any()))
                 .willReturn(new ClassificationResult(Category.DEVELOPMENT, List.of("다이어그램"), "스프링 필터 체인"));
-        given(tagRepository.findByName(any())).willReturn(Optional.empty());
-        given(tagRepository.findByNameForUpdate("다이어그램"))
-                .willReturn(Optional.of(Tag.builder().name("다이어그램").build()));
+        given(tagService.getOrCreate("다이어그램")).willReturn(Tag.builder().name("다이어그램").build());
 
         classifier.classify(item);
 
@@ -129,42 +126,15 @@ class ItemClassifierTest {
         given(geminiService.isEnabled()).willReturn(true);
         given(geminiService.classify(any(), any()))
                 .willReturn(new ClassificationResult(Category.DEVELOPMENT, List.of("spring", "jpa")));
-        // 신규 태그: 빠른 조회는 미스 → insertIgnore 후 잠금 읽기로 확보.
-        given(tagRepository.findByName(any())).willReturn(Optional.empty());
-        given(tagRepository.findByNameForUpdate("spring"))
-                .willReturn(Optional.of(Tag.builder().name("spring").build()));
-        given(tagRepository.findByNameForUpdate("jpa"))
-                .willReturn(Optional.of(Tag.builder().name("jpa").build()));
+        given(tagService.getOrCreate("spring")).willReturn(Tag.builder().name("spring").build());
+        given(tagService.getOrCreate("jpa")).willReturn(Tag.builder().name("jpa").build());
 
         classifier.classify(item);
 
         assertThat(item.getCategory()).isEqualTo(Category.DEVELOPMENT);
         assertThat(item.getTags()).extracting(Tag::getName).containsExactly("spring", "jpa");
-        // saveAndFlush(충돌 시 트랜잭션 오염) 대신 INSERT IGNORE 경로를 타야 한다.
-        verify(tagRepository).insertIgnore("spring");
-        verify(tagRepository).insertIgnore("jpa");
-    }
-
-    @Test
-    void 긴_태그명은_50자로_자른_뒤_조회_생성한다() { // 예측 버그 #2 — 조회·저장 길이 불일치 방지
-        Item item = linkItem();
-        String longTag = "t".repeat(Tag.NAME_MAX + 20);
-        String cut = "t".repeat(Tag.NAME_MAX);
-        given(geminiService.isEnabled()).willReturn(true);
-        given(geminiService.classify(any(), any()))
-                .willReturn(new ClassificationResult(Category.DEVELOPMENT, List.of(longTag)));
-        given(tagRepository.findByName(any())).willReturn(Optional.empty());
-        given(tagRepository.findByNameForUpdate(cut))
-                .willReturn(Optional.of(Tag.builder().name(cut).build()));
-
-        classifier.classify(item);
-
-        // 빠른 조회·insert·잠금 재조회 모두 잘린 이름(50자)으로 일관돼야 한다.
-        verify(tagRepository).findByName(cut);
-        verify(tagRepository).insertIgnore(cut);
-        assertThat(item.getTags()).singleElement()
-                .extracting(Tag::getName, org.assertj.core.api.InstanceOfAssertFactories.STRING)
-                .hasSize(Tag.NAME_MAX);
+        verify(tagService).getOrCreate("spring");
+        verify(tagService).getOrCreate("jpa");
     }
 
     private Item linkItem() {

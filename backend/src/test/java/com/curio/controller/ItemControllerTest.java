@@ -163,4 +163,62 @@ class ItemControllerTest {
                         .content("{\"memo\":\"x\"}"))
                 .andExpect(status().isUnauthorized());
     }
+
+    @Test
+    void 카테고리_수정도_update로_위임한다() throws Exception { // 설계결정 #33
+        given(itemService.update(eq(7L), eq(5L), any())).willReturn(null);
+
+        mockMvc.perform(patch("/api/v1/items/5")
+                        .with(authentication(asUser(7L)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"category\":\"DEVELOPMENT\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("SUCCESS"));
+
+        verify(itemService).update(eq(7L), eq(5L), any());
+    }
+
+    @Test
+    void 태그_추가는_principal의_userId로_위임한다() throws Exception {
+        given(itemService.addTag(eq(7L), eq(5L), eq("spring"))).willReturn(null);
+
+        mockMvc.perform(post("/api/v1/items/5/tags")
+                        .with(authentication(asUser(7L)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"spring\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("SUCCESS"));
+
+        verify(itemService).addTag(eq(7L), eq(5L), eq("spring"));
+    }
+
+    @Test
+    void 빈_태그_추가는_400_INVALID_INPUT() throws Exception {
+        mockMvc.perform(post("/api/v1/items/5/tags")
+                        .with(authentication(asUser(7L)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+    }
+
+    @Test
+    void 태그_삭제는_쿼리파라미터_이름으로_위임한다() throws Exception {
+        given(itemService.removeTag(eq(7L), eq(5L), eq("spring"))).willReturn(null);
+
+        mockMvc.perform(delete("/api/v1/items/5/tags?name=spring")
+                        .with(authentication(asUser(7L))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("SUCCESS"));
+
+        verify(itemService).removeTag(eq(7L), eq(5L), eq("spring"));
+    }
+
+    @Test
+    void 미인증_태그추가는_401() throws Exception {
+        mockMvc.perform(post("/api/v1/items/5/tags")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"spring\"}"))
+                .andExpect(status().isUnauthorized());
+    }
 }

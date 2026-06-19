@@ -57,6 +57,13 @@ public class Item {
     @Column(nullable = false)
     private boolean titleEditedByUser = false;
 
+    /**
+     * 사용자가 카테고리를 직접 고쳤는지. true면 reclassify-all이 다시 분류하지 않는다(설계결정 #33).
+     * AI 오분류를 사용자가 정정한 뒤 백필이 되돌리는 사고를 막는다(#31 titleEditedByUser의 카테고리판).
+     */
+    @Column(nullable = false)
+    private boolean categoryEditedByUser = false;
+
     @Column(columnDefinition = "TEXT")
     private String content;
 
@@ -128,8 +135,19 @@ public class Item {
         this.tags.clear();
     }
 
+    /** 사용자가 아이템에서 태그를 뗀다(join 행만 제거, 공유 Tag 자체는 유지 — 다른 아이템 무영향). */
+    public void removeTagByName(String name) {
+        this.tags.removeIf(t -> t.getName().equals(name));
+    }
+
     public void updateCategory(Category category) {
         this.category = category;
+    }
+
+    /** 사용자가 카테고리를 직접 수정한다(AI 오분류 정정). 이후 재분류가 덮어쓰지 않도록 플래그를 세운다(#33). */
+    public void editCategory(Category category) {
+        this.category = category;
+        this.categoryEditedByUser = true;
     }
 
     public void updateLinkMetadata(String title, String content, String thumbnailUrl) {

@@ -1,12 +1,9 @@
 package com.curio.service;
 
-import com.curio.common.TextUtils;
 import com.curio.dto.item.ClassificationResult;
 import com.curio.entity.Item;
-import com.curio.entity.Tag;
 import com.curio.entity.enums.Category;
 import com.curio.entity.enums.ItemType;
-import com.curio.repository.TagRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -23,7 +20,7 @@ public class ItemClassifier {
     private static final int MIN_TEXT_LENGTH_FOR_AI = 20;
 
     private final GeminiService geminiService;
-    private final TagRepository tagRepository;
+    private final TagService tagService;
     private final S3Service s3Service;
 
     public void classify(Item item) {
@@ -61,7 +58,7 @@ public class ItemClassifier {
         }
         item.updateCategory(result.category());
         for (String name : result.tags()) {
-            item.addTag(getOrCreateTag(name));
+            item.addTag(tagService.getOrCreate(name));
         }
     }
 
@@ -80,25 +77,9 @@ public class ItemClassifier {
         }
         item.updateCategory(result.category());
         for (String name : result.tags()) {
-            item.addTag(getOrCreateTag(name));
+            item.addTag(tagService.getOrCreate(name));
         }
         // 사용자가 안 고친 제목만 캡션으로 채운다(가드는 Item.applyAiTitle 내부). 캡션 없으면 날짜형 폴백 유지.
         item.applyAiTitle(result.title());
-    }
-
-    private Tag getOrCreateTag(String rawName) {
-        // 태그명도 컬럼 길이(Tag.NAME_MAX)를 넘으면 저장 시 잘리므로, 조회·생성 모두 잘린 값으로 통일해
-        // findByName(원본)과 저장값(잘린값)이 어긋나 재조회가 빗나가는 일을 막는다.
-        String name = TextUtils.truncate(rawName, Tag.NAME_MAX);
-        // 빠른 경로: 이미 있으면 그대로 사용(잠금 없이).
-        return tagRepository.findByName(name).orElseGet(() -> {
-            // 없으면 원자적 insert(중복이어도 예외 없음) 후, 잠금 읽기로 (동시 생성분 포함) 확실히 확보한다.
-            // 예전엔 saveAndFlush가 unique 충돌 시 DataIntegrityViolationException을 던져 본 트랜잭션을
-            // rollback-only로 오염 → catch에서 복구한 듯 진행해도 커밋 때 500 + 저장 유실됐다.
-            // INSERT IGNORE로 그 예외 경로를 없애고, REPEATABLE READ 스냅샷을 우회하는 잠금 읽기로 재조회한다.
-            tagRepository.insertIgnore(name);
-            return tagRepository.findByNameForUpdate(name)
-                    .orElseThrow(() -> new IllegalStateException("태그 확보 실패: " + name));
-        });
     }
 }
