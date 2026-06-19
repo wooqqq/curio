@@ -12,7 +12,7 @@ jwt:
   access-secret: ${JWT_ACCESS_SECRET:dev-access-secret-key-must-be-at-least-32-chars}
   refresh-secret: ${JWT_REFRESH_SECRET:dev-refresh-secret-key-must-be-at-least-32-chars}
   access-expiration: ${JWT_ACCESS_EXPIRATION:1800000}
-  refresh-expiration: ${JWT_REFRESH_EXPIRATION:1209600000}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:7776000000}  # 90일 — 재방문 마찰↓ (설계결정 #34)
 
 kakao:
   client-id: ${KAKAO_CLIENT_ID}
