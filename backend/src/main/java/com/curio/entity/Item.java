@@ -147,6 +147,18 @@ public class Item {
         this.titleEditedByUser = true;
     }
 
+    /**
+     * AI 비전 캡션이 제목을 채운다(설계결정 #32). 사용자가 직접 고친 제목은 보존하므로
+     * titleEditedByUser 플래그는 세우지 않는다 — 사용자가 손댄 적 있으면(true) 그대로 둔다.
+     * 백필이 다시 돌아도 사용자 제목은 안 덮어쓰고, 안 고친 제목은 재캡션할 수 있다.
+     */
+    public void applyAiTitle(String title) {
+        if (this.titleEditedByUser || title == null || title.isBlank()) {
+            return;
+        }
+        this.title = TextUtils.truncate(title, TITLE_MAX);
+    }
+
     /** 사용자 메모를 갱신한다. 빈 문자열이면 메모를 비운다(null). */
     public void updateMemo(String memo) {
         this.memo = (memo == null || memo.isBlank()) ? null : TextUtils.truncate(memo, MEMO_MAX);

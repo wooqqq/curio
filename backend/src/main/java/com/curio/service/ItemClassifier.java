@@ -24,11 +24,20 @@ public class ItemClassifier {
 
     private final GeminiService geminiService;
     private final TagRepository tagRepository;
+    private final S3Service s3Service;
 
     public void classify(Item item) {
-        // 이미지는 분류할 텍스트가 없으니 AI 호출 없이 ETC.
+        // 이미지는 비전으로 분류한다(설계결정 #32). 여기(백필/재분류 경로)선 영구 보관본(S3)에서 바이트를 받는다.
+        // 라이브 저장 경로는 ItemProcessor가 방금 다운로드한 바이트로 classifyImage를 직접 호출(재다운로드 회피).
         if (item.getType() == ItemType.IMAGE) {
-            item.updateCategory(Category.ETC);
+            // 키 없으면 다운로드도 생략하고 미분류로 둔다(키 켠 뒤 백필이 잡게, #21).
+            if (!geminiService.isEnabled()) {
+                return;
+            }
+            S3Service.DownloadedImage img = s3Service.downloadFromKey(item.getS3Key());
+            if (img != null) {
+                classifyImage(item, img.bytes(), img.contentType());
+            }
             return;
         }
         // 너무 짧은 텍스트는 비용만 들고 결과도 부정확해 ETC.
@@ -54,6 +63,27 @@ public class ItemClassifier {
         for (String name : result.tags()) {
             item.addTag(getOrCreateTag(name));
         }
+    }
+
+    /**
+     * 이미지 바이트로 비전 분류 — 제목(캡션)·category·tags를 한 번에 채운다(설계결정 #32).
+     * 라이브 경로(ItemProcessor.processImage)가 방금 다운로드한 바이트로 직접 호출한다.
+     * 실패/키없음/바이트없음이면 아무것도 굳히지 않고 폴백(날짜형 제목 + 미분류)을 그대로 둔다(#21·#30).
+     */
+    public void classifyImage(Item item, byte[] imageBytes, String mimeType) {
+        if (imageBytes == null || imageBytes.length == 0 || !geminiService.isEnabled()) {
+            return;
+        }
+        ClassificationResult result = geminiService.classifyImage(imageBytes, mimeType);
+        if (result == null) {
+            return;
+        }
+        item.updateCategory(result.category());
+        for (String name : result.tags()) {
+            item.addTag(getOrCreateTag(name));
+        }
+        // 사용자가 안 고친 제목만 캡션으로 채운다(가드는 Item.applyAiTitle 내부). 캡션 없으면 날짜형 폴백 유지.
+        item.applyAiTitle(result.title());
     }
 
     private Tag getOrCreateTag(String rawName) {

@@ -16,6 +16,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -56,6 +57,21 @@ public class GeminiService {
             Return ONLY valid JSON, no explanation.
             """;
 
+    private static final String VISION_PROMPT = """
+            You are a content classifier for a Korean developer's personal archive service.
+            Look at the image and return JSON in this exact format:
+            {"title": "한 줄 제목", "category": "DEVELOPMENT", "tags": ["태그1", "태그2"]}
+
+            title: a short, natural Korean caption (one line, at most 40 characters) describing
+            what the image shows. Be concrete (e.g. "스프링 시큐리티 필터 체인 다이어그램").
+            Categories (pick exactly one):
+            - DEVELOPMENT: programming, tech, tools, frameworks, CS concepts, code/terminal/diagram screenshots
+            - CAREER: job-seeking and career — job postings, recruitment, salary, resume(자소서), interview, portfolio, career tips
+            - ETC: anything else
+            tags: 1-5 short Korean or English keywords relevant to the image.
+            Return ONLY valid JSON, no explanation.
+            """;
+
     /** API 키가 설정돼 실제 분류가 가능한지. 키가 없으면 호출자가 분류를 미룬다. */
     public boolean isEnabled() {
         return StringUtils.hasText(apiKey);
@@ -74,7 +90,9 @@ public class GeminiService {
 
         String userInput = buildInput(title, content);
         try {
-            String responseText = callGemini(userInput);
+            // 텍스트 한 파트만 담은 contents
+            Map<String, Object> textPart = Map.of("text", userInput);
+            String responseText = callGemini(SYSTEM_PROMPT, List.of(textPart));
             return parseResult(responseText);
         } catch (Exception e) {
             log.error("Gemini classification failed: {}", e.getMessage());
@@ -82,15 +100,40 @@ public class GeminiService {
         }
     }
 
-    private String callGemini(String userInput) {
+    /**
+     * 이미지를 비전 멀티모달로 분류한다 — 한 줄 제목(캡션) + category + tags를 한 번의 호출로(설계결정 #32).
+     * 텍스트 분류와 마찬가지로 <b>실패 시 null</b>을 돌려 호출자가 미분류로 남기게 한다.
+     * @param mimeType "image/jpeg" 등 — Gemini inline_data가 요구
+     */
+    public ClassificationResult classifyImage(byte[] imageBytes, String mimeType) {
+        if (!StringUtils.hasText(apiKey) || imageBytes == null || imageBytes.length == 0) {
+            return null;
+        }
+        try {
+            // 이미지 파트(base64) + 지시 텍스트 한 줄. 분류 기준·출력 형식은 system_instruction(VISION_PROMPT)이 담당.
+            Map<String, Object> imagePart = Map.of(
+                    "inline_data", Map.of(
+                            "mime_type", StringUtils.hasText(mimeType) ? mimeType : "image/jpeg",
+                            "data", Base64.getEncoder().encodeToString(imageBytes)));
+            Map<String, Object> textPart = Map.of("text", "Classify this image.");
+            String responseText = callGemini(VISION_PROMPT, List.of(imagePart, textPart));
+            return parseResult(responseText);
+        } catch (Exception e) {
+            log.error("Gemini image classification failed: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /** system_instruction + contents의 parts를 받아 generateContent를 호출하고 응답 텍스트를 돌려준다. */
+    private String callGemini(String systemPrompt, List<Map<String, Object>> parts) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         // 키를 URL 쿼리(?key=) 대신 헤더로 — 로그·히스토리 노출 방지
         headers.set("x-goog-api-key", apiKey);
 
         Map<String, Object> body = Map.of(
-                "system_instruction", Map.of("parts", List.of(Map.of("text", SYSTEM_PROMPT))),
-                "contents", List.of(Map.of("parts", List.of(Map.of("text", userInput)))),
+                "system_instruction", Map.of("parts", List.of(Map.of("text", systemPrompt))),
+                "contents", List.of(Map.of("parts", parts)),
                 // 응답을 순수 JSON으로 강제 (OpenAI의 response_format json_object 대응)
                 "generationConfig", Map.of("responseMimeType", "application/json")
         );
@@ -107,8 +150,8 @@ public class GeminiService {
         }
         Map<?, ?> first = (Map<?, ?>) candidates.get(0);
         Map<?, ?> contentNode = (Map<?, ?>) first.get("content");
-        List<?> parts = (List<?>) contentNode.get("parts");
-        return (String) ((Map<?, ?>) parts.get(0)).get("text");
+        List<?> responseParts = (List<?>) contentNode.get("parts");
+        return (String) ((Map<?, ?>) responseParts.get(0)).get("text");
     }
 
     // package-private: 응답 파싱 로직을 GeminiServiceTest로 직접 검증한다.
@@ -131,7 +174,12 @@ public class GeminiService {
             }
         }
 
-        return new ClassificationResult(category, new ArrayList<>(tags));
+        // title은 비전 응답에만 있다(텍스트 분류 응답엔 없어 null). 공백이면 null로 둬 호출자가 폴백 제목을 쓰게.
+        JsonNode titleNode = root.get("title");
+        String title = (titleNode != null && !titleNode.asText().isBlank())
+                ? titleNode.asText().trim() : null;
+
+        return new ClassificationResult(category, new ArrayList<>(tags), title);
     }
 
     private String buildInput(String title, String content) {

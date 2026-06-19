@@ -34,5 +34,26 @@ class GeminiServiceTest {
 
         assertThat(result.category()).isEqualTo(Category.CAREER);
         assertThat(result.tags()).containsExactly("이력서", "면접");
+        assertThat(result.title()).isNull(); // 텍스트 분류 응답엔 title이 없어 null
+    }
+
+    @Test
+    void parseResult_비전응답의_title을_캡션으로_파싱한다() throws Exception { // 설계결정 #32
+        String json = "{\"title\":\"스프링 필터 체인 다이어그램\",\"category\":\"DEVELOPMENT\",\"tags\":[\"스프링\"]}";
+
+        ClassificationResult result = service.parseResult(json);
+
+        assertThat(result.title()).isEqualTo("스프링 필터 체인 다이어그램");
+        assertThat(result.category()).isEqualTo(Category.DEVELOPMENT);
+        assertThat(result.tags()).containsExactly("스프링");
+    }
+
+    @Test
+    void parseResult_빈_title은_null로_둔다() throws Exception { // 공백 캡션이면 호출자가 날짜형 폴백을 쓰게
+        String json = "{\"title\":\"  \",\"category\":\"ETC\",\"tags\":[]}";
+
+        ClassificationResult result = service.parseResult(json);
+
+        assertThat(result.title()).isNull();
     }
 }

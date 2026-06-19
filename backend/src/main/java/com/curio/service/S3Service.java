@@ -39,7 +39,15 @@ public class S3Service {
     @Value("${aws.region:ap-northeast-2}")
     private String region;
 
-    public String uploadFromUrl(String imageUrl, Long userId) {
+    /** S3 업로드 결과 + 다운로드한 원본 바이트·content-type. 비전 분류가 같은 바이트를 재사용한다(설계결정 #32). */
+    public record DownloadedImage(String key, byte[] bytes, String contentType) {}
+
+    /**
+     * 외부 이미지 URL을 받아 S3에 올리고, 올린 키와 함께 <b>다운로드한 바이트·content-type을 돌려준다</b>.
+     * 호출자(ItemProcessor)가 같은 바이트를 비전 분류에 재사용해 추가 다운로드 없이 쓰게 하기 위함(#32).
+     * 버킷 미설정/다운로드·업로드 실패 시 null(아이템은 폴백 제목으로 저장된다).
+     */
+    public DownloadedImage uploadFromUrl(String imageUrl, Long userId) {
         if (!StringUtils.hasText(bucket)) {
             log.warn("S3 bucket not configured, skipping upload");
             return null;
@@ -48,13 +56,33 @@ public class S3Service {
             // SSRF 방지: 내부/사설 대역으로 향하면 BLOCKED_URL → 아래 catch에서 null(다운로드 안 함).
             UrlGuard.verifyPublic(imageUrl);
             byte[] data = downloadBytes(imageUrl);
-            String contentType = detectContentType(imageUrl);
-            String ext = contentType.contains("png") ? "png" : "jpg";
-            String key = buildKey(userId, ext);
+            // content-type은 URL 확장자(없을 수 있음)보다 magic byte를 신뢰 — Gemini inline_data mime 정확도에 중요.
+            String contentType = detectContentType(data, imageUrl);
+            String key = buildKey(userId, extFor(contentType));
             upload(data, contentType, key);
-            return key;
+            return new DownloadedImage(key, data, contentType);
         } catch (Exception e) {
             log.error("S3 upload failed for {}: {}", imageUrl, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * 이미 S3에 보관된 이미지를 다시 받아온다(백필용 — reclassify-all이 기존 사진을 비전 재분류할 때).
+     * 라이브 경로(uploadFromUrl)와 달리 원본 kakaocdn URL은 만료되므로 영구 보관본(공개 S3 URL)에서 받는다.
+     * s3Key 없거나 실패 시 null.
+     */
+    public DownloadedImage downloadFromKey(String s3Key) {
+        if (!StringUtils.hasText(bucket) || !StringUtils.hasText(s3Key)) {
+            return null;
+        }
+        String url = getPublicUrl(s3Key);
+        try {
+            UrlGuard.verifyPublic(url);
+            byte[] data = downloadBytes(url);
+            return new DownloadedImage(s3Key, data, detectContentType(data, s3Key));
+        } catch (Exception e) {
+            log.error("S3 download failed for key {}: {}", s3Key, e.getMessage());
             return null;
         }
     }
@@ -161,11 +189,26 @@ public class S3Service {
         return userId + "/" + date + "/" + UUID.randomUUID() + "." + ext;
     }
 
-    private String detectContentType(String url) {
-        String lower = url.toLowerCase();
+    /** 다운로드 바이트의 magic byte로 content-type을 판별하고, 못 맞히면 URL 확장자로 폴백(기본 jpeg). */
+    private String detectContentType(byte[] d, String url) {
+        if (d != null && d.length >= 12) {
+            if ((d[0] & 0xFF) == 0xFF && (d[1] & 0xFF) == 0xD8) return "image/jpeg";
+            if ((d[0] & 0xFF) == 0x89 && d[1] == 0x50 && d[2] == 0x4E && d[3] == 0x47) return "image/png";
+            if (d[0] == 'G' && d[1] == 'I' && d[2] == 'F') return "image/gif";
+            if (d[0] == 'R' && d[1] == 'I' && d[2] == 'F' && d[3] == 'F'
+                    && d[8] == 'W' && d[9] == 'E' && d[10] == 'B' && d[11] == 'P') return "image/webp";
+        }
+        String lower = url == null ? "" : url.toLowerCase();
         if (lower.contains(".png")) return "image/png";
         if (lower.contains(".gif")) return "image/gif";
         if (lower.contains(".webp")) return "image/webp";
         return "image/jpeg";
+    }
+
+    private String extFor(String contentType) {
+        if (contentType.contains("png")) return "png";
+        if (contentType.contains("gif")) return "gif";
+        if (contentType.contains("webp")) return "webp";
+        return "jpg";
     }
 }

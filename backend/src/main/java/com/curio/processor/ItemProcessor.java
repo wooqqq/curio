@@ -151,21 +151,25 @@ public class ItemProcessor {
     }
 
     private void processImage(User user, String imageUrl) {
-        String s3Key = s3Service.uploadFromUrl(imageUrl, user.getId());
+        S3Service.DownloadedImage uploaded = s3Service.uploadFromUrl(imageUrl, user.getId());
+        String s3Key = uploaded != null ? uploaded.key() : null;
         String thumbnailUrl = s3Key != null ? s3Service.getPublicUrl(s3Key) : imageUrl;
 
         Item item = Item.builder()
                 .user(user)
                 .type(ItemType.IMAGE)
-                // 기본 제목을 "이미지" 대신 날짜형으로(예: "6월 18일 사진") — 안 고쳐도 멀쩡하게.
-                // 사용자는 상세 화면에서 직접 수정할 수 있다.
+                // 기본 제목을 "이미지" 대신 날짜형으로(예: "6월 18일 사진") — 비전 캡션이 실패해도 멀쩡하게.
+                // 비전이 성공하면 아래 classifyImage가 이 제목을 캡션으로 덮어쓴다(설계결정 #32).
                 .title(LocalDate.now().format(IMAGE_TITLE_FORMAT))
                 .originalUrl(imageUrl)
                 .thumbnailUrl(thumbnailUrl)
                 .s3Key(s3Key)
                 .build();
 
-        itemClassifier.classify(item);
+        // 방금 받은 바이트를 그대로 비전 분류에 재사용(재다운로드 없음, #32). 업로드 실패면 폴백 제목·미분류로 저장.
+        if (uploaded != null) {
+            itemClassifier.classifyImage(item, uploaded.bytes(), uploaded.contentType());
+        }
         itemRepository.save(item);
         log.info("IMAGE saved: userId={}", user.getId());
     }
