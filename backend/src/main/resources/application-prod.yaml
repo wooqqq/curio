@@ -12,7 +12,7 @@ jwt:
   access-secret: ${JWT_ACCESS_SECRET}
   refresh-secret: ${JWT_REFRESH_SECRET}
   access-expiration: ${JWT_ACCESS_EXPIRATION:1800000}
-  refresh-expiration: ${JWT_REFRESH_EXPIRATION:1209600000}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:7776000000}  # 90일 — 재방문 마찰↓ (설계결정 #34). prod 실제값은 Railway 환경변수
 
 kakao:
   client-id: ${KAKAO_CLIENT_ID}

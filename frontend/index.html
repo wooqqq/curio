@@ -7,7 +7,13 @@
     <link rel="shortcut icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- 홈화면 설치 시 풀스크린 앱처럼 (설계결정 #34). iOS는 apple-* 메타, 안드로이드/크롬은 manifest+mobile-web-app-capable -->
+    <meta name="theme-color" content="#134E4A" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Curio" />
     <title>Curio · 나만의 정보 아카이브</title>
   </head>
   <body>
