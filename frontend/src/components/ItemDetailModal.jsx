@@ -18,7 +18,9 @@ function getDomain(url) {
 // 카드 탭 시 뜨는 상세 바텀시트. 제목/메모 수정 + 원문 열기.
 // 썸네일/원문 이동은 명시 버튼으로 분리해 실수 이동을 줄인다.
 function ItemDetailModal({ item, onClose, onSaved }) {
+  const isText = item.type === 'TEXT'
   const [title, setTitle] = useState(item.title || '')
+  const [content, setContent] = useState(item.content || '')
   const [memo, setMemo] = useState(item.memo || '')
   const [category, setCategory] = useState(item.category || null)
   const [tags, setTags] = useState(item.tags || [])
@@ -47,10 +49,13 @@ function ItemDetailModal({ item, onClose, onSaved }) {
 
   const source = getDomain(item.originalUrl) || TYPE_LABEL[item.type] || '아이템'
   const trimmedTitle = title.trim()
+  const trimmedContent = content.trim()
   const dirty = trimmedTitle !== (item.title || '').trim()
     || memo.trim() !== (item.memo || '').trim()
     || category !== (item.category || null)
-  const canSave = dirty && trimmedTitle.length > 0 && !saving
+    || (isText && trimmedContent !== (item.content || '').trim())
+  // TEXT는 본문이 비면 저장 불가(빈 메모 아이템 방지).
+  const canSave = dirty && trimmedTitle.length > 0 && (!isText || trimmedContent.length > 0) && !saving
 
   const handleOpenOriginal = () => {
     if (item.originalUrl) window.open(item.originalUrl, '_blank', 'noopener')
@@ -64,6 +69,7 @@ function ItemDetailModal({ item, onClose, onSaved }) {
     if (trimmedTitle !== (item.title || '').trim()) body.title = trimmedTitle
     if (memo.trim() !== (item.memo || '').trim()) body.memo = memo.trim()
     if (category && category !== (item.category || null)) body.category = category
+    if (isText && trimmedContent !== (item.content || '').trim()) body.content = trimmedContent
     try {
       const res = await updateItem(item.id, body)
       onSaved(res.data)
@@ -148,6 +154,20 @@ function ItemDetailModal({ item, onClose, onSaved }) {
           placeholder="제목을 입력하세요"
           className="w-full bg-[#f9fafb] border border-[#e5e8eb] rounded-xl px-4 py-3 text-[15px] font-semibold text-[#191f28] placeholder:text-[#b0b8c1] outline-none focus:border-[#3182f6] focus:bg-white transition-colors"
         />
+
+        {/* 본문 — TEXT 아이템만 편집 가능(설계결정 #35) */}
+        {isText && (
+          <>
+            <label className="block text-xs font-semibold text-[#8b95a1] mt-4 mb-1.5">내용</label>
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="내용을 입력하세요"
+              rows={6}
+              className="w-full resize-none bg-[#f9fafb] border border-[#e5e8eb] rounded-xl px-4 py-3 text-sm text-[#191f28] leading-relaxed placeholder:text-[#b0b8c1] outline-none focus:border-[#3182f6] focus:bg-white transition-colors"
+            />
+          </>
+        )}
 
         {/* 메모 */}
         <label className="block text-xs font-semibold text-[#8b95a1] mt-4 mb-1.5">메모</label>

@@ -9,6 +9,16 @@ export const getItems = (category, page = 0, size = 20, q = '') => {
 
 export const addItem = (url) => client.post('/items', { url })
 
+// 텍스트(메모) 직접 추가 → TEXT 아이템 (설계결정 #35)
+export const addText = (text) => client.post('/items/text', { text })
+
+// 이미지 파일 직접 업로드 → IMAGE 아이템 (비전 캡션 자동). FormData면 axios가 multipart 헤더를 자동 설정.
+export const addImage = (file) => {
+  const form = new FormData()
+  form.append('file', file)
+  return client.post('/items/image', form)
+}
+
 // 제목/메모/카테고리 부분 수정 ({ title?, memo?, category? })
 export const updateItem = (id, body) => client.patch(`/items/${id}`, body)
 
