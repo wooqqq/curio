@@ -132,6 +132,10 @@ function ItemCard({ item, onRecrawl, onDelete, onOpenDetail }) {
   const source = domain || SOURCE_LABEL[item.type] || '링크'
   // 저장 당시 크롤링 실패로 제목 자리에 raw URL이 들어간 경우
   const titleBroken = item.type === 'LINK' && /^https?:\/\//i.test(item.title || '')
+  // TEXT 본문 미리보기 = 첫 줄(=제목) '다음' 내용만. 한 줄짜리면 비어서 안 보여줘 제목과 중복되지 않는다(#35).
+  const textPreview = item.type === 'TEXT' && item.content
+    ? item.content.split('\n').slice(1).join('\n').trim()
+    : ''
 
   // 본문 탭 = 상세 시트(제목·메모 수정), 썸네일 탭 = 원문 바로 열기
   const handleClick = () => onOpenDetail(item)
@@ -187,9 +191,9 @@ function ItemCard({ item, onRecrawl, onDelete, onOpenDetail }) {
           {titleBroken ? (domain || '제목 없음') : (item.title || item.content || '제목 없음')}
         </p>
 
-        {item.type === 'TEXT' && item.content && (
+        {textPreview && (
           <p className="text-[13px] text-[#6b7684] leading-snug line-clamp-2 mb-1.5 whitespace-pre-wrap">
-            {item.content}
+            {textPreview}
           </p>
         )}
 

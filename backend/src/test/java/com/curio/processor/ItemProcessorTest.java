@@ -93,8 +93,8 @@ class ItemProcessorTest {
     }
 
     @Test
-    void textTitle_100자_넘는_첫줄은_잘라_말줄임() {
+    void textTitle_긴_첫줄도_말줄임없이_그대로_반환한다() { // 잘림은 카드 CSS·컬럼 길이가 처리(#35)
         String t = processor.textTitle("가".repeat(150));
-        assertThat(t).hasSize(101).endsWith("…"); // 100자 + …
+        assertThat(t).hasSize(150).doesNotEndWith("…");
     }
 }

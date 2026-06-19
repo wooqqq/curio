@@ -239,8 +239,9 @@ public class ItemProcessor {
     }
 
     /**
-     * TEXT 제목 = 본문 첫 줄(앞뒤 공백 정리), 100자 초과면 잘라 …. 전체는 content가 보관한다.
-     * 앞 100자를 통째로 제목에 넣어 문장이 중간에 끊기던 것을 첫 줄 라벨로 바꾼다(설계결정 #35).
+     * TEXT 제목 = 본문 첫 줄(앞뒤 공백 정리). 전체는 content가 보관한다(설계결정 #35).
+     * "…"를 붙이지 않는다 — 붙이면 편집창에 글자로 박히고, 한 줄짜리 긴 글은 제목과 본문 미리보기가
+     * 중복돼 보였다. 화면 잘림은 카드 CSS(line-clamp)가, 길이 상한은 Item 빌더(TITLE_MAX)가 처리한다.
      */
     // package-private: 순수 함수라 ItemProcessorTest에서 직접 검증한다.
     String textTitle(String text) {
@@ -249,7 +250,7 @@ public class ItemProcessor {
         if (nl >= 0) {
             first = first.substring(0, nl).strip();
         }
-        return first.length() > 100 ? TextUtils.truncate(first, 100) + "…" : first;
+        return first;
     }
 
     // package-private: 순수 분기 로직이라 같은 패키지 테스트(ItemProcessorTest)에서 직접 검증한다.
