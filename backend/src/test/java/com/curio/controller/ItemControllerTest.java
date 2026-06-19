@@ -13,6 +13,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -28,6 +29,7 @@ import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -219,6 +221,53 @@ class ItemControllerTest {
         mockMvc.perform(post("/api/v1/items/5/tags")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"spring\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void 텍스트_추가는_addText로_위임한다() throws Exception { // 설계결정 #35
+        given(itemService.addText(eq(7L), eq("오늘의 메모"))).willReturn(null);
+
+        mockMvc.perform(post("/api/v1/items/text")
+                        .with(authentication(asUser(7L)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"오늘의 메모\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("SUCCESS"));
+
+        verify(itemService).addText(eq(7L), eq("오늘의 메모"));
+    }
+
+    @Test
+    void 빈_텍스트_추가는_400_INVALID_INPUT() throws Exception {
+        mockMvc.perform(post("/api/v1/items/text")
+                        .with(authentication(asUser(7L)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+    }
+
+    @Test
+    void 이미지_추가는_addImage로_위임한다() throws Exception { // 설계결정 #35
+        given(itemService.addImage(eq(7L), any())).willReturn(null);
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "photo.png", "image/png", new byte[]{1, 2, 3});
+
+        mockMvc.perform(multipart("/api/v1/items/image")
+                        .file(file)
+                        .with(authentication(asUser(7L))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("SUCCESS"));
+
+        verify(itemService).addImage(eq(7L), any());
+    }
+
+    @Test
+    void 미인증_텍스트추가는_401() throws Exception {
+        mockMvc.perform(post("/api/v1/items/text")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"text\":\"메모\"}"))
                 .andExpect(status().isUnauthorized());
     }
 }

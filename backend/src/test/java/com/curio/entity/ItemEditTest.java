@@ -68,4 +68,22 @@ class ItemEditTest {
 
         assertThat(item.getMemo()).hasSize(Item.MEMO_MAX);
     }
+
+    @Test
+    void TEXT는_본문편집이_적용된다() { // 설계결정 #35 — content는 사용자 소유라 TEXT만 편집 1급
+        Item item = Item.builder().type(ItemType.TEXT).title("t").content("옛 본문").build();
+
+        item.updateContent("새 본문");
+
+        assertThat(item.getContent()).isEqualTo("새 본문");
+    }
+
+    @Test
+    void LINK은_본문편집이_무시된다() { // LINK content는 OG/AI 파생이라 사용자 편집 불가
+        Item item = linkItem(); // content 없음(null)
+
+        item.updateContent("덮어쓰기 시도");
+
+        assertThat(item.getContent()).isNull();
+    }
 }

@@ -74,4 +74,27 @@ class ItemProcessorTest {
     void normalizeUrl_추적파라미터는_제거하고_나머지는_보존한다(String input, String expected) {
         assertThat(processor.normalizeUrl(input)).isEqualTo(expected);
     }
+
+    // --- textTitle: TEXT 제목 = 첫 줄 (설계결정 #35) ---
+
+    @Test
+    void textTitle_첫_줄을_제목으로_쓴다() {
+        assertThat(processor.textTitle("첫 줄\n둘째 줄\n셋째 줄")).isEqualTo("첫 줄");
+    }
+
+    @Test
+    void textTitle_앞뒤_공백을_정리한다() {
+        assertThat(processor.textTitle("  \n  진짜 제목  \n뒤")).isEqualTo("진짜 제목");
+    }
+
+    @Test
+    void textTitle_줄바꿈_없으면_전체가_제목() {
+        assertThat(processor.textTitle("짧은 한 줄 메모")).isEqualTo("짧은 한 줄 메모");
+    }
+
+    @Test
+    void textTitle_100자_넘는_첫줄은_잘라_말줄임() {
+        String t = processor.textTitle("가".repeat(150));
+        assertThat(t).hasSize(101).endsWith("…"); // 100자 + …
+    }
 }

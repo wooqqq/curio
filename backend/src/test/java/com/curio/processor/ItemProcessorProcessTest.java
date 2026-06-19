@@ -4,6 +4,7 @@ import com.curio.dto.item.OgData;
 import com.curio.entity.Item;
 import com.curio.entity.User;
 import com.curio.entity.enums.ItemType;
+import com.curio.exception.CurioException;
 import com.curio.repository.ItemRepository;
 import com.curio.repository.UserRepository;
 import com.curio.service.ItemClassifier;
@@ -22,10 +23,12 @@ import java.util.Locale;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 /**
@@ -98,5 +101,48 @@ class ItemProcessorProcessTest {
         // classify(텍스트 경로)가 아니라 classifyImage로, 업로드가 돌려준 바로 그 바이트·mime을 넘겨야 한다.
         verify(itemClassifier).classifyImage(any(Item.class), eq(bytes), eq("image/png"));
         verify(itemRepository).save(any());
+    }
+
+    // --- 웹 직접 추가 (설계결정 #35) ---
+
+    @Test
+    void addText_빈_내용은_INVALID_INPUT() {
+        given(userRepository.findById(1L)).willReturn(Optional.of(mock(User.class)));
+
+        assertThatThrownBy(() -> processor.addText(1L, "   \n  "))
+                .isInstanceOf(CurioException.class);
+        verify(itemRepository, never()).save(any());
+    }
+
+    @Test
+    void addText_첫줄_제목으로_TEXT를_저장한다() {
+        given(userRepository.findById(1L)).willReturn(Optional.of(mock(User.class)));
+
+        processor.addText(1L, "메모 제목\n본문 둘째 줄");
+
+        ArgumentCaptor<Item> captor = ArgumentCaptor.forClass(Item.class);
+        verify(itemRepository).save(captor.capture());
+        assertThat(captor.getValue().getType()).isEqualTo(ItemType.TEXT);
+        assertThat(captor.getValue().getTitle()).isEqualTo("메모 제목");      // 첫 줄만 제목
+        assertThat(captor.getValue().getContent()).isEqualTo("메모 제목\n본문 둘째 줄"); // 전체는 본문
+    }
+
+    @Test
+    void addImage_업로드후_비전분류하고_IMAGE를_저장한다() {
+        given(userRepository.findById(1L)).willReturn(Optional.of(mock(User.class)));
+        byte[] bytes = {(byte) 0x89, 0x50, 0x4E, 0x47};
+        given(s3Service.uploadUserImage(any(), any()))
+                .willReturn(new S3Service.DownloadedImage("1/2026/06/up.png", bytes, "image/png"));
+        given(s3Service.getPublicUrl("1/2026/06/up.png")).willReturn("https://s3/up.png");
+
+        processor.addImage(1L, bytes);
+
+        // 업로드 바이트를 그대로 비전 분류에 넘기고, 공개 URL을 썸네일·원문으로 둔다.
+        verify(itemClassifier).classifyImage(any(Item.class), eq(bytes), eq("image/png"));
+        ArgumentCaptor<Item> captor = ArgumentCaptor.forClass(Item.class);
+        verify(itemRepository).save(captor.capture());
+        assertThat(captor.getValue().getType()).isEqualTo(ItemType.IMAGE);
+        assertThat(captor.getValue().getThumbnailUrl()).isEqualTo("https://s3/up.png");
+        assertThat(captor.getValue().getOriginalUrl()).isEqualTo("https://s3/up.png");
     }
 }
