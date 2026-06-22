@@ -150,6 +150,51 @@ public class ItemProcessor {
         return message != null && message.toLowerCase().contains("uk_user_normalized_url");
     }
 
+    /**
+     * 웹앱에서 텍스트(메모)를 직접 추가한다. 봇 saveText와 저장 로직을 공유하고, 동기로 결과를 반환해
+     * 화면에 즉시 카드를 띄운다(설계결정 #35). 빈 내용이면 INVALID_INPUT.
+     */
+    @Transactional
+    public ItemResponse addText(Long userId, String text) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CurioException(ErrorCode.USER_NOT_FOUND));
+
+        String body = text == null ? "" : text.strip();
+        if (body.isEmpty()) {
+            throw new CurioException(ErrorCode.INVALID_INPUT, "내용을 입력해주세요.");
+        }
+        return ItemResponse.from(saveText(user, body));
+    }
+
+    /**
+     * 웹앱에서 이미지 파일을 직접 업로드해 저장한다(설계결정 #35). S3 업로드(magic-byte 검증·10MB 상한) 후
+     * 봇 사진과 동일하게 #32 비전으로 캡션·카테고리·태그를 채운다. 업로드한 바이트를 그대로 비전에 재사용.
+     * 업로드 이미지는 외부 원문이 없으므로 originalUrl·thumbnailUrl 모두 공개 S3 URL로 둔다.
+     */
+    @Transactional
+    public ItemResponse addImage(Long userId, byte[] data) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CurioException(ErrorCode.USER_NOT_FOUND));
+
+        S3Service.DownloadedImage uploaded = s3Service.uploadUserImage(data, user.getId());
+        String publicUrl = s3Service.getPublicUrl(uploaded.key());
+
+        Item item = Item.builder()
+                .user(user)
+                .type(ItemType.IMAGE)
+                // 비전 실패 시 폴백 제목(날짜형). 성공하면 classifyImage가 캡션으로 덮어쓴다(#32).
+                .title(LocalDate.now().format(IMAGE_TITLE_FORMAT))
+                .originalUrl(publicUrl)
+                .thumbnailUrl(publicUrl)
+                .s3Key(uploaded.key())
+                .build();
+
+        itemClassifier.classifyImage(item, uploaded.bytes(), uploaded.contentType());
+        itemRepository.save(item);
+        log.info("IMAGE (web upload) saved: userId={}", user.getId());
+        return ItemResponse.from(item);
+    }
+
     private void processImage(User user, String imageUrl) {
         S3Service.DownloadedImage uploaded = s3Service.uploadFromUrl(imageUrl, user.getId());
         String s3Key = uploaded != null ? uploaded.key() : null;
@@ -175,16 +220,37 @@ public class ItemProcessor {
     }
 
     private void processText(User user, String text) {
+        saveText(user, text);
+    }
+
+    /** TEXT 아이템 저장 로직 — 봇(processText)과 웹(addText)이 공유한다. content엔 전체, 제목은 첫 줄(설계결정 #35). */
+    private Item saveText(User user, String text) {
         Item item = Item.builder()
                 .user(user)
                 .type(ItemType.TEXT)
-                .title(text.length() > 100 ? TextUtils.truncate(text, 100) + "..." : text)
+                .title(textTitle(text))
                 .content(text)
                 .build();
 
         itemClassifier.classify(item);
         itemRepository.save(item);
         log.info("TEXT saved: userId={}", user.getId());
+        return item;
+    }
+
+    /**
+     * TEXT 제목 = 본문 첫 줄(앞뒤 공백 정리). 전체는 content가 보관한다(설계결정 #35).
+     * "…"를 붙이지 않는다 — 붙이면 편집창에 글자로 박히고, 한 줄짜리 긴 글은 제목과 본문 미리보기가
+     * 중복돼 보였다. 화면 잘림은 카드 CSS(line-clamp)가, 길이 상한은 Item 빌더(TITLE_MAX)가 처리한다.
+     */
+    // package-private: 순수 함수라 ItemProcessorTest에서 직접 검증한다.
+    String textTitle(String text) {
+        String first = text.strip();
+        int nl = first.indexOf('\n');
+        if (nl >= 0) {
+            first = first.substring(0, nl).strip();
+        }
+        return first;
     }
 
     // package-private: 순수 분기 로직이라 같은 패키지 테스트(ItemProcessorTest)에서 직접 검증한다.

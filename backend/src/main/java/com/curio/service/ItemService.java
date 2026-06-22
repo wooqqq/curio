@@ -40,6 +40,18 @@ public class ItemService {
         return itemProcessor.addLink(userId, url);
     }
 
+    /** 웹앱에서 텍스트 직접 추가(설계결정 #35). 동기 저장 후 아이템 반환. */
+    @Transactional
+    public ItemResponse addText(Long userId, String text) {
+        return itemProcessor.addText(userId, text);
+    }
+
+    /** 웹앱에서 이미지 파일 직접 업로드(설계결정 #35). 동기 저장 + 비전 분류 후 아이템 반환. */
+    @Transactional
+    public ItemResponse addImage(Long userId, byte[] data) {
+        return itemProcessor.addImage(userId, data);
+    }
+
     public Page<ItemResponse> getItems(Long userId, Category category, String q, int page, int size) {
         PageRequest pageable = PageRequest.of(page, size);
         String keyword = (q == null || q.isBlank()) ? null : q.trim();
@@ -83,6 +95,13 @@ public class ItemService {
         }
         if (request.category() != null) {
             item.editCategory(request.category());
+        }
+        if (request.content() != null && item.getType() == ItemType.TEXT) {
+            String content = request.content().strip();
+            if (content.isEmpty()) {
+                throw new CurioException(ErrorCode.INVALID_INPUT);
+            }
+            item.updateContent(content);
         }
         return ItemResponse.from(item);
     }

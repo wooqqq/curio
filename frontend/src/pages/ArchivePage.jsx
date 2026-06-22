@@ -6,7 +6,7 @@ import { checkAdmin } from '../api/admin'
 import client from '../api/client'
 import useAuthStore from '../store/authStore'
 import PopupModal from '../components/PopupModal'
-import AddLinkModal from '../components/AddLinkModal'
+import AddItemModal from '../components/AddItemModal'
 import ItemDetailModal from '../components/ItemDetailModal'
 
 const TYPE_ICON = {
@@ -132,6 +132,10 @@ function ItemCard({ item, onRecrawl, onDelete, onOpenDetail }) {
   const source = domain || SOURCE_LABEL[item.type] || '링크'
   // 저장 당시 크롤링 실패로 제목 자리에 raw URL이 들어간 경우
   const titleBroken = item.type === 'LINK' && /^https?:\/\//i.test(item.title || '')
+  // TEXT 본문 미리보기 = 첫 줄(=제목) '다음' 내용만. 한 줄짜리면 비어서 안 보여줘 제목과 중복되지 않는다(#35).
+  const textPreview = item.type === 'TEXT' && item.content
+    ? item.content.split('\n').slice(1).join('\n').trim()
+    : ''
 
   // 본문 탭 = 상세 시트(제목·메모 수정), 썸네일 탭 = 원문 바로 열기
   const handleClick = () => onOpenDetail(item)
@@ -186,6 +190,12 @@ function ItemCard({ item, onRecrawl, onDelete, onOpenDetail }) {
         <p className="text-[15px] font-bold text-[#191f28] leading-snug line-clamp-2 mb-1">
           {titleBroken ? (domain || '제목 없음') : (item.title || item.content || '제목 없음')}
         </p>
+
+        {textPreview && (
+          <p className="text-[13px] text-[#6b7684] leading-snug line-clamp-2 mb-1.5 whitespace-pre-wrap">
+            {textPreview}
+          </p>
+        )}
 
         {item.memo && (
           <p className="flex items-center gap-1 text-[13px] text-[#6b7684] line-clamp-1 mb-1.5">
@@ -332,7 +342,7 @@ function ArchivePage() {
   return (
     <div className="min-h-screen bg-[#f2f4f6]">
       {showModal && <LinkCodeModal onClose={() => setShowModal(false)} />}
-      {showAddModal && <AddLinkModal onClose={() => setShowAddModal(false)} onAdded={handleAdded} />}
+      {showAddModal && <AddItemModal onClose={() => setShowAddModal(false)} onAdded={handleAdded} />}
       {detailItem && (
         <ItemDetailModal
           item={detailItem}

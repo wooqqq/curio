@@ -4,15 +4,20 @@ import com.curio.dto.ApiResponse;
 import com.curio.dto.item.AddItemRequest;
 import com.curio.dto.item.ItemResponse;
 import com.curio.dto.item.TagRequest;
+import com.curio.dto.item.TextRequest;
 import com.curio.dto.item.UpdateItemRequest;
 import com.curio.entity.enums.Category;
+import com.curio.exception.CurioException;
+import com.curio.exception.ErrorCode;
 import com.curio.service.ItemService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.Map;
 
 @RestController
@@ -46,6 +51,27 @@ public class ItemController {
             @Valid @RequestBody AddItemRequest request
     ) {
         return ApiResponse.success(itemService.addLink(userId, request.url()));
+    }
+
+    /** 웹앱에서 텍스트(메모) 직접 추가 (설계결정 #35). 성공 시 저장된 TEXT 아이템. */
+    @PostMapping("/text")
+    public ApiResponse<ItemResponse> addText(
+            @AuthenticationPrincipal Long userId,
+            @Valid @RequestBody TextRequest request
+    ) {
+        return ApiResponse.success(itemService.addText(userId, request.text()));
+    }
+
+    /** 웹앱에서 이미지 파일 직접 업로드 (설계결정 #35). 성공 시 비전 분류까지 채운 IMAGE 아이템. */
+    @PostMapping("/image")
+    public ApiResponse<ItemResponse> addImage(
+            @AuthenticationPrincipal Long userId,
+            @RequestParam("file") MultipartFile file
+    ) throws IOException {
+        if (file == null || file.isEmpty()) {
+            throw new CurioException(ErrorCode.INVALID_IMAGE);
+        }
+        return ApiResponse.success(itemService.addImage(userId, file.getBytes()));
     }
 
     /** 아이템 제목/메모 수정. {title?, memo?} 부분 업데이트. 본인 소유 아니면 ITEM_NOT_FOUND. */

@@ -8,11 +8,11 @@ spring:
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
 
-  # 팝업 배너 이미지 업로드 한도(기본 1MB는 이미지에 작음)
+  # 이미지 업로드 한도 — 사용자 이미지 추가(#35)·팝업 배너 공용. 기본 1MB는 사진에 작아 10MB로.
   servlet:
     multipart:
-      max-file-size: 5MB
-      max-request-size: 5MB
+      max-file-size: 10MB
+      max-request-size: 11MB
 
   jpa:
     open-in-view: false

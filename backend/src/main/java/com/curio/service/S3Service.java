@@ -88,6 +88,29 @@ public class S3Service {
     }
 
     /**
+     * 사용자가 웹에서 업로드한 이미지를 S3에 올리고 키·바이트·content-type을 돌려준다(설계결정 #35).
+     * magic byte로 jpeg/png/webp/gif만 허용(uploadImage와 동일) + 10MB 상한. 돌려준 바이트는 호출자가
+     * 비전 분류(#32)에 그대로 재사용한다. 버킷 미설정/검증 실패는 예외로 알린다(사용자가 결과를 즉시 알아야 함).
+     */
+    public DownloadedImage uploadUserImage(byte[] data, Long userId) {
+        if (!StringUtils.hasText(bucket)) {
+            throw new CurioException(ErrorCode.S3_NOT_CONFIGURED);
+        }
+        if (data == null || data.length > MAX_DOWNLOAD_BYTES) {
+            throw new CurioException(ErrorCode.INVALID_IMAGE, "이미지는 10MB 이하만 올릴 수 있어요.");
+        }
+        ImageType type = detectImageType(data); // 허용되지 않으면 INVALID_IMAGE
+        String key = buildKey(userId, type.ext);
+        try {
+            upload(data, type.contentType, key);
+        } catch (Exception e) {
+            log.error("S3 user image upload failed: {}", e.getMessage());
+            throw new CurioException(ErrorCode.UPLOAD_FAILED);
+        }
+        return new DownloadedImage(key, data, type.contentType);
+    }
+
+    /**
      * 관리자가 올린 이미지 파일을 S3에 업로드하고 공개 URL을 반환한다(팝업 배너용).
      * Content-Type 헤더는 위조 가능하므로 신뢰하지 않고, 파일 시그니처(magic byte)로
      * jpeg/png/webp/gif만 허용한다(svg 등 스크립트 포함 가능 타입 차단).

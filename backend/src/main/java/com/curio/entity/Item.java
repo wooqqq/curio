@@ -182,6 +182,13 @@ public class Item {
         this.memo = (memo == null || memo.isBlank()) ? null : TextUtils.truncate(memo, MEMO_MAX);
     }
 
+    /** TEXT 아이템 본문 편집(설계결정 #35). content가 사용자 소유인 TEXT에만 적용 — 다른 타입은 무시한다. */
+    public void updateContent(String content) {
+        if (this.type == ItemType.TEXT) {
+            this.content = content;
+        }
+    }
+
     public void updateStatus(ItemStatus status) {
         this.status = status;
     }
