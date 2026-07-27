@@ -1,0 +1,161 @@
+# Curio — AGENTS.md
+
+AI 세션 간 컨텍스트 유지용 문서. 새 세션 시작 시 이 파일부터 읽는다.
+
+---
+
+## 프로젝트 개요
+
+| 항목 | 내용 |
+|------|------|
+| 서비스명 | Curio |
+| 한 줄 설명 | 카카오톡으로 보내기만 하면 AI가 자동 정리해주는 개인 아카이브 |
+| 타겟 | IT 취준생 / 주니어 개발자 |
+| 도메인 | mycurio.kr (배포 직전 구매 예정) |
+
+---
+
+## 기술 스택
+
+| 구분 | 기술 |
+|------|------|
+| 백엔드 | Java 21, Spring Boot 3.5.x, Gradle |
+| DB | MySQL 8 (Docker Compose 로컬) |
+| 캐시/큐 | Redis |
+| ORM | Hibernate JPA (ddl-auto: update) |
+| 인증 | 카카오 OAuth2 + JWT (Access 메모리 / Refresh httpOnly 쿠키) |
+| AI | Google Gemini (gemini-2.5-flash, AI Studio 무료티어) |
+| 파일 | AWS S3 (키: userId/yyyy/MM/uuid.png) |
+| API 문서 | SpringDoc OpenAPI (Swagger) |
+| 프론트 | React + Vite, Tailwind CSS, Zustand |
+| 배포 | 백엔드: Railway(Docker) / 프론트: Vercel / CI: GitHub Actions |
+
+---
+
+## 디렉토리 구조
+
+```
+curio/                          ← 모노레포 루트
+├── AGENTS.md                   ← 이 파일
+├── PROGRESS.md                 ← 일별 진행 기록 (gitignore)
+├── curio-implementation-plan.md
+├── docker-compose.yml
+├── .env.example
+├── frontend/
+│   └── src/
+│       ├── components/
+│       ├── pages/
+│       ├── store/              ← Zustand
+│       ├── api/
+│       └── styles/
+└── backend/
+    └── src/main/java/com/curio/
+        ├── config/             ← CORS, Swagger, Security, Async, AWS
+        ├── dto/
+        │   ├── kakao/          ← KakaoSkillRequest/Response
+        │   └── item/           ← OgData, ClassificationResult
+        ├── entity/
+        │   ├── enums/          ← ItemType, Category, ItemStatus
+        │   └── (User, Item, Tag, RefreshToken, Announcement, Popup)
+        ├── repository/
+        ├── service/
+        │   ├── queue/          ← QueueService (인터페이스 + 구현체)
+        │   ├── OgCrawlerService
+        │   ├── OpenAiService
+        │   ├── S3Service       ← uploadFromUrl(크롤 이미지) + uploadImage(관리자 업로드, magic byte 검증)
+        │   ├── LinkCodeService
+        │   ├── AnnouncementService
+        │   └── PopupService    ← 활성 팝업 1개 보장
+        ├── processor/          ← ItemProcessor (크롤링, AI, 저장)
+        ├── controller/         ← Item, Announcement, Popup(공개) + Admin(관리자 전용)
+        ├── exception/          ← GlobalExceptionHandler, ErrorCode
+        └── security/           ← JwtFilter, JwtUtil, CookieUtil, AdminGuard(ADMIN_KAKAO_IDS allowlist)
+```
+
+---
+
+## API 규칙
+
+- prefix: `/api/v1`
+- 응답 형식: `{ code, data, message }` (ApiResponse)
+- 에러 시 code는 ErrorCode enum 값
+
+---
+
+## 카카오 오픈빌더 연동 핵심
+
+- 챗봇 스킬 서버 **5초 응답 제한** → 즉시 "저장 중" 응답 후 비동기 처리
+- 비동기 구조: `Controller → QueueService → ItemProcessor`
+- MVP: `@Async` / 추후: Redis Stream 교체 가능 구조
+
+---
+
+## ERD 요약
+
+- `users` — 카카오 OAuth 유저
+- `items` — 저장 아이템 (LINK/IMAGE/TEXT, 카테고리: DEVELOPMENT/CAREER/ETC — 커리어·취업 통합)
+- `tags` + `item_tags` — 다대다
+- `refresh_tokens` — JWT refresh rotation
+- `announcements` — 관리자 공지 게시물
+- `popups` — 진입 팝업 배너 (활성 1개, linkUrl로 공지/외부 연결)
+
+---
+
+## 환경 변수
+
+루트의 `.env.example` 참고. 실제 값은 `.env`에 저장 (gitignore).
+
+---
+
+## 배포 (운영)
+
+- 백엔드: Railway — `https://curio-production-1728.up.railway.app` (Docker, `/actuator/health`)
+- 프론트: Vercel — `https://curio-three-ashy.vercel.app`
+- 프론트가 `/api/*`를 Railway로 프록시(`frontend/vercel.json`) → 같은 출처라 refresh 쿠키 first-party
+- 카카오봇 스킬 URL = Railway `/api/v1/kakao/skill` (ngrok 불필요)
+- 배포 절차·환경변수 체크리스트는 루트 `DEPLOY.md`
+- 브랜치 흐름: `develop` 작업 → `main` 머지 = 자동 배포 (Railway/Vercel이 main 추적), CI는 GitHub Actions
+
+---
+
+## 구현 단계 현황
+
+| Phase | 내용 | 상태 |
+|-------|------|------|
+| Phase 1 | 환경 세팅 | ✅ 완료 |
+| Phase 2 | 카카오 로그인 | ✅ 완료 |
+| Phase 3 | 핵심 파이프라인 | ✅ 완료 |
+| Phase 4 | 웹 아카이브 UI | ✅ 완료 |
+| Phase 5 | 검색 | ✅ 완료 |
+| Phase 6 | 배포 | ✅ 완료 (Railway + Vercel, 로그인·저장 E2E 검증) |
+
+### 배포 후 추가 기능 (✅ 배포 완료)
+- 공지/팝업 관리자 페이지 (`/admin`) — 공지 CRUD, 팝업(이미지 업로드·linkUrl·활성) CRUD
+- 사용자 공지 열람 — `/announcements` 목록 + 상세, 아카이브 진입 팝업 모달(이미지/본문 클릭→linkUrl, 오늘 하루 보지 않기)
+- 관리자 동선: 팝업 폼에서 "공지에서 가져오기"로 linkUrl 자동입력 / 공지 상세에 관리자용 "팝업 만들기"(linkUrl 프리필)·수정·삭제 (쿼리파라미터 `?tab=&link=&edit=`)
+- 관리자 권한: `ADMIN_KAKAO_IDS` allowlist (설계결정 #15) / 팝업 모델: 설계결정 #16
+- S3 실구축 완료 (버킷 `curio-prod-assets`, 서울) — 그 전까지 dormant였음
+- 웹에서 링크 직접 추가 — 아카이브 우하단 FAB(+) → 바텀시트, `POST /items` 동기 처리(크롤+분류+저장 후 아이템 반환, 중복 시 `DUPLICATE_URL`), 봇과 저장 로직 공유 (설계결정 #17)
+- 유튜브 링크 oEmbed — 유튜브 호스트는 oEmbed로 제목·썸네일·채널명 (일반 스크래핑 타임아웃 회피), 실패 시 OG 크롤 폴백 (설계결정 #18)
+- AI 분류 Gemini 전환 — OpenAI(크레딧 소진)에서 Google Gemini 무료티어로 교체 (`GeminiService`, gemini-2.5-flash). 프롬프트·파이프라인 동일 (설계결정 #19)
+- 카테고리 커리어·취업 통합 — `Category`에서 JOB 제거, DEVELOPMENT/CAREER/ETC 3개. 세부는 태그가 담당 (설계결정 #20). AI 호출 실패 시 ETC 대신 미분류(null)로 남겨 오염 방지 (설계결정 #21)
+- 휴면 `aiSummary` 필드 제거 — 항상 null이던 죽은 필드(엔티티·DTO·검색·프론트) 정리 (설계결정 #22)
+- URL 중복 정규화 개선 — `normalizeUrl`이 쿼리를 통째로 버려 유튜브 영상이 중복 판정되던 버그 수정. 추적 파라미터(`utm_*`·`fbclid` 등)만 제거(denylist)하고 의미 있는 쿼리 보존 (설계결정 #23)
+- 카톡 사진 첨부 저장 — 카카오가 사진 전송 시 `params.media.url`(+`flow.trigger=IMAGE_UPLOAD`)로 이미지 URL을 줌. `media.url`을 IMAGE로 명시 처리(큐 계약 `enqueue(userId, content, ItemType)`로 확장) → kakaocdn→S3 복사→썸네일 저장. 기존 "알려진 빚"이 사실은 동작 중이었고 정규식 우연 의존을 명시 신호로 견고화 (설계결정 #30)
+- 아이템 제목/메모 수정 + 카드 상세 시트 — 카드 본문 탭=상세 바텀시트(`ItemDetailModal`: 제목 인라인 수정·메모·태그·원문 열기), 썸네일 탭=원문 바로 열기로 분리. `PATCH /items/{id}` {title?, memo?} 부분 수정(본인 소유 검증, 공백 제목 `INVALID_INPUT`). `Item`에 `memo`·`titleEditedByUser` 추가 — 제목 직접 수정 시 재크롤이 안 덮어쓰게. 사진 기본 제목 "이미지"→날짜형(`M월 d일 사진`). 피드 카드는 메모 한 줄 미리보기 (설계결정 #31)
+- 사진 제목·분류 AI 비전 — 사진이 날짜형 제목 + ETC로만 쌓이던 한계를 gemini-2.5-flash 멀티모달 호출 한 번으로 한 줄 캡션 + category + tags 동시 생성해 해소. `GeminiService.classifyImage`(inline_data 비전 파트, `callGemini`를 텍스트/비전 공유로 일반화), `S3Service.uploadFromUrl`이 키+다운로드 바이트 반환(`DownloadedImage`)해 비전에 재사용(재다운로드 없음)·백필은 `downloadFromKey`로 S3에서 재취득. 실패/키없음이면 날짜형 제목+미분류 폴백(#21), 사용자가 고친 제목은 `applyAiTitle`이 `titleEditedByUser`로 보존(#31). 무료 Gemini 티어에 사진 원본을 보내는 프라이버시 트레이드오프 명시 수용 (설계결정 #32)
+- AI 분류 사용자 정정 — AI 오분류를 사용자가 고침. `PATCH /items/{id}`에 `category` 추가(`Item.editCategory`가 `categoryEditedByUser` 세팅, `findForReclassify`가 그 플래그 제외해 재분류가 정정을 안 되돌림 — #31 가드의 카테고리판). 태그 추가/삭제 `POST`/`DELETE /items/{id}/tags`(아이템 단위 join, 공유 Tag 유지, rename은 제외). race-safe get-or-create(#28)를 `TagService`로 빼 자동/수동 공유. 프론트 `ItemDetailModal`에 카테고리 칩(저장 시 반영)+태그 칩 ×삭제·입력 추가(즉시 반영). 페르소나 확장 시 동적 카테고리는 보류(AI 자유생성 금지, 사용자 소유 구조+AI 제안 지향) (설계결정 #33)
+- 재방문 마찰↓ — 매번 로그인하던 원인은 refresh 14일 고정(#11 회전 제거로 슬라이딩 없음). `jwt.refresh-expiration` 기본값 14일→90일(yaml·`.env`·`.env.example`, prod 실제값은 Railway `JWT_REFRESH_EXPIRATION`) + PWA 홈화면 메타(theme-color·apple/mobile-web-app-capable·viewport-fit, manifest 기존). 네이티브 앱 대신 접근 편의는 인증/PWA 레이어에서 해결 — 네이티브 auto-login은 긴 refresh 쿠키와 동일 효과인데 #11~#13 쿠키 인증을 재설계해 비싸게 다시 만드는 것. iOS PWA 세션 유실이 실측되면 그때 Capacitor 검토 (설계결정 #34)
+- 웹 캡처 링크/텍스트/이미지 완성 + TEXT 본문 표시·편집 — 봇은 셋 다 받는데 웹 FAB는 링크만 받았고(#31·#32가 미뤄둔 "웹 이미지 경로 없음"), 봇 TEXT는 탭해도 본문이 안 보였다(`ItemDetailModal`이 content 미표시). FAB를 타입 선택 시트(`AddItemModal`: 링크/텍스트/이미지 탭)로 확장 — `POST /items/text`(봇 `saveText` 공유)·`POST /items/image`(multipart 10MB, `S3Service.uploadUserImage` magic-byte 검증 + #32 `classifyImage` 캡션·분류 자동). TEXT 제목=첫 줄(`textTitle`, `…` 안 붙임)·content=전체, `PATCH /items/{id}`에 content 추가(TEXT 타입가드, LINK·IMAGE는 OG/AI 파생이라 차단). `ItemDetailModal`이 TEXT 본문 textarea 편집·카드 본문 미리보기(첫 줄 다음만, 한 줄이면 안 뜸=제목 중복 방지). memo(#31)는 의도 달라 분리 유지 (설계결정 #35)
+
+### 테스트 / 문서
+- 단위·슬라이스 테스트 1~3단계 도입 — 1단계 순수 함수(`detectType`·`normalizeUrl`·`titleFromUrl`·`truncate`) + 2단계 목킹(Mockito: `ItemClassifier`·`ItemProcessor`) + 3단계 슬라이스(`@WebMvcTest ItemController` 실제 SecurityConfig import / `@DataJpaTest ItemRepository.search` H2 MySQL 호환 모드, 페이징·COUNT DISTINCT 포함) + 인증 핵심 경로 직접 테스트(`JwtUtilTest`·`JwtFilterTest` — 토큰 발급·검증·키 격리·만료, 토큰→principal 주입) + 봇 페이로드 슬라이스(`KakaoControllerTest` — 실측 사진/텍스트 JSON 역직렬화→라우팅) + 제목/메모 편집(`ItemEditTest` 재크롤 가드·메모 비우기·길이 컷, `ItemControllerTest` PATCH 위임·404·401, 사진 날짜형 제목 캡처) + 비전 분류·사용자 정정(`GeminiServiceTest` 비전 title 파싱, `ItemClassifierTest` 비전 백필·캡션 가드·실패 폴백, `TagServiceTest` race/truncation 이관, `ItemControllerTest` 카테고리 PATCH·태그 add/remove 위임). 16클래스 ~130케이스. 테스트가 실제 버그 4건 발견·수정(유튜브 URL 중복 정규화 / AI 태그 중복 / 봇 발화 URL 미추출 / 미인증 응답 403→401 — 설계결정 #24) + 플래키 테스트 1건 결정화(`JwtUtilTest` — 서명 마지막 base64 글자는 안 쓰는 하위 비트가 있어 변조해도 같은 토큰이 될 수 있어 ~1/16 실패 → 헤더 변조로 수정). 전략·로드맵은 `docs/testing.md`, 슬라이스 전용 프로필은 `application-test.yaml`
+- 예측 버그 백로그 — 3단계 후 코드 정독으로 추린 잠재 버그 5건(PROGRESS에 정리). #1 페이지네이션 음수/0→500, #4 링크 동시추가 TOCTOU→500(설계결정 #25), #2 필드 길이 초과→500(truncate + 이모지 surrogate 방지, 설계결정 #26), #3 SSRF→내부 대역 차단(설계결정 #27)은 수정·배포 완료. #5 동기 크롤 스레드 점유 — 시간 예산 유한화로 처리(RestTemplate 타임아웃 + 크롤 12s 데드라인, 설계결정 #29). 낙관적 비동기 전환은 트래픽이 정당화할 때로 백로그
+- 코드리뷰 발견 버그 — 테스트 작업 변경분(`b912cb3^..HEAD`)을 리뷰해 태그 동시 생성 레이스의 트랜잭션 오염(`getOrCreateTag`의 `saveAndFlush` catch가 RR에서 복구 불가 → 커밋 500·저장 유실) 수정. `INSERT IGNORE` + 잠금 읽기로 race 자체 제거(설계결정 #28). 하위 3건도 청소: `addLink` catch를 URL 중복 위반으로만 좁힘(다른 위반은 전파), `Item.addTag` 멱등화(truncate 수렴 중복 방지), 크롤 catch 넓혀 폴백 복원(`BLOCKED_URL`만 전파)
+- 기능 명세서 — 노션 프로젝트 페이지 아래 인라인 DB(코드 기반 19개 기능, 대/중/소 계층번호)
+
+---
+
+## 세션 시작 시
+
+새 세션 시작 시 AGENTS.md → PROGRESS.md 순으로 읽고 컨텍스트 파악.
